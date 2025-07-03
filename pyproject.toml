@@ -1,0 +1,58 @@
+[project]
+name = "pySDA"
+version = "1.0.0"
+description = "Автоматический торговый бот для Steam с поддержкой SDA"
+authors = [
+    { name = "dr11m", email = "drr111m@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10.8"
+license = { text = "MIT" }
+
+dependencies = [
+    "beautifulsoup4>=4.12.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "rsa>=4.9",
+    "yarl>=1.9.0",
+    "aenum>=3.1.0",
+    "pyyaml>=6.0",
+    "steampy>=1.2.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+steam-bot = "main:main"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true 
