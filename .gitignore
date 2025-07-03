@@ -182,3 +182,4 @@ cython_debug/
 
 accounts_info/*
 config.yaml
+logs/*
