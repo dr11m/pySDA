@@ -3,16 +3,14 @@
 Обработчик market ордеров для CLI интерфейса
 """
 
-import logging
 import re
 from typing import List, Optional
 
 from bs4 import BeautifulSoup
 
+from src.utils.logger_setup import logger
 from .constants import Messages
 from .display_formatter import DisplayFormatter
-
-logger = logging.getLogger(__name__)
 
 
 class MarketHandler:

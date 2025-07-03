@@ -4,11 +4,9 @@ Cookie Checker - Автоматическая проверка и обновле
 """
 
 from typing import Optional, Callable, Any
-import logging
 from .constants import Messages
 from .display_formatter import DisplayFormatter
-
-logger = logging.getLogger(__name__)
+from src.utils.logger_setup import logger
 
 
 class CookieChecker:

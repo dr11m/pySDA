@@ -4,7 +4,6 @@
 """
 
 import json
-import logging
 import shutil
 import os
 import time
@@ -14,10 +13,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, TYPE_CHECKING, Protocol
 from dataclasses import dataclass, asdict
 
+from src.utils.logger_setup import logger
 from .constants import Messages, AutoMenuChoice
 from .display_formatter import DisplayFormatter
-
-logger = logging.getLogger(__name__)
 
 # Импорты для типизации
 if TYPE_CHECKING:
@@ -388,9 +386,7 @@ class AutoManager:
         """Проверка и обновление cookies (тихо, без лишних логов)"""
         try:
             # Временно отключаем логирование cookie_checker
-            cookie_logger = logging.getLogger('src.cookie_updater')
-            original_level = cookie_logger.level
-            cookie_logger.setLevel(logging.ERROR)
+            # Логирование уже настроено через loguru в logger_setup.py
             
             try:
                 result = cli_context.cookie_checker.ensure_valid_cookies()
@@ -489,20 +485,12 @@ class AutoManager:
         print("🎁 Проверка бесплатных трейдов...")
         
         try:
-            # Временно отключаем логирование для уменьшения спама
-            trade_logger = logging.getLogger('src.trade_confirmation_manager')
-            original_level = trade_logger.level
-            trade_logger.setLevel(logging.WARNING)
-            
-            try:
-                # Используем оригинальный метод с кэшированием
-                stats = cli_context.trade_manager.process_free_trades(
-                    auto_accept=True,
-                    auto_confirm=self.settings.auto_confirm_trades
-                )
-            finally:
-                # Восстанавливаем уровень логирования
-                trade_logger.setLevel(original_level)
+            # Логирование уже настроено через loguru в logger_setup.py
+            # Используем оригинальный метод с кэшированием
+            stats = cli_context.trade_manager.process_free_trades(
+                auto_accept=True,
+                auto_confirm=self.settings.auto_confirm_trades
+            )
             
             if stats:
                 found = stats.get('found_free_trades', 0)
@@ -531,19 +519,11 @@ class AutoManager:
         print("🔑 Проверка трейдов, требующих подтверждения...")
         
         try:
-            # Временно отключаем логирование для уменьшения спама
-            trade_logger = logging.getLogger('src.trade_confirmation_manager')
-            original_level = trade_logger.level
-            trade_logger.setLevel(logging.WARNING)
-            
-            try:
-                # Используем оригинальный метод с кэшированием
-                stats = cli_context.trade_manager.process_confirmation_needed_trades(
-                    auto_confirm=True
-                )
-            finally:
-                # Восстанавливаем уровень логирования
-                trade_logger.setLevel(original_level)
+            # Логирование уже настроено через loguru в logger_setup.py
+            # Используем оригинальный метод с кэшированием
+            stats = cli_context.trade_manager.process_confirmation_needed_trades(
+                auto_confirm=True
+            )
             
             if stats:
                 found = stats.get('found_confirmation_needed', 0)
