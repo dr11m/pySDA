@@ -1,0 +1,9 @@
+# Steam API настройки
+steam:
+  # если его нет - то через настройки вы всегда сможете сгенерировать его
+  # и уже после сохранить в конфиг
+  api_key: ""
+  username: ""
+  password: ""
+  mafile_path: "accounts_info/username.maFile"
+  steam_id: ""
