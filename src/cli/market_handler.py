@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from bs4 import BeautifulSoup
 
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, print_and_log
 from .constants import Messages
 from .display_formatter import DisplayFormatter
 
@@ -24,63 +24,57 @@ class MarketHandler:
     def confirm_all_market_orders(self) -> bool:
         """Подтвердить все market ордера через Guard"""
         try:
-            print(self.formatter.format_section_header("🏪 Подтверждение market ордеров"))
-            print("ℹ️  Поиск market ордеров, требующих подтверждения через Guard")
-            print()
+            logger.info("🏪 Подтверждение market ордеров")
+            logger.info("ℹ️  Поиск market ордеров, требующих подтверждения через Guard")
             
             # Проверяем cookies
             if not self.cookie_checker.ensure_valid_cookies():
-                print("❌ Не удалось получить действительные cookies")
+                logger.error("❌ Не удалось получить действительные cookies")
                 return False
             
             # Получаем Steam клиента
-            steam_client = self.trade_manager.get_steam_client()
+            steam_client = self.trade_manager._get_steam_client()
             if not steam_client:
-                print("❌ Не удалось получить Steam клиента")
+                logger.error("❌ Не удалось получить Steam клиента")
                 return False
             
             # Получаем все подтверждения
             confirmations = self._get_market_confirmations(steam_client)
             
             if not confirmations:
-                print(Messages.NO_MARKET_CONFIRMATIONS)
-                print("💡 Все market ордера уже подтверждены или не требуют подтверждения")
+                print_and_log(Messages.NO_MARKET_CONFIRMATIONS)
                 return True
             
-            print(Messages.MARKET_CONFIRMATIONS_FOUND.format(count=len(confirmations)))
-            print()
-            
-            # Показываем список найденных подтверждений
-            self._display_confirmations(confirmations)
+            logger.info(f"Найдено {len(confirmations)} market подтверждений")
             
             # Подтверждаем каждый ордер
             confirmed_count = 0
             for i, confirmation in enumerate(confirmations, 1):
                 try:
-                    print(f"🔄 Подтверждение ордера {i}/{len(confirmations)}...", end=" ")
+                    print_and_log(f"🔄 Подтверждение ордера {i}/{len(confirmations)}...")
                     
                     if self._confirm_market_order(steam_client, confirmation):
                         confirmed_count += 1
-                        print("✅")
+                        print_and_log("✅ Ордер подтвержден")
                     else:
-                        print("❌")
+                        print_and_log("❌ Ошибка подтверждения ордера", "ERROR")
                         
                 except Exception as e:
-                    print(f"❌ Ошибка: {e}")
+                    logger.error(f"❌ Ошибка: {e}")
                     continue
             
-            print()
             if confirmed_count > 0:
-                print(Messages.MARKET_CONFIRMATIONS_SUCCESS.format(count=confirmed_count))
+                print_and_log(f"✅ Подтверждено {confirmed_count} market ордеров", "SUCCESS")
                 if confirmed_count < len(confirmations):
-                    print(f"⚠️ Не удалось подтвердить {len(confirmations) - confirmed_count} ордеров")
+                    failed_count = len(confirmations) - confirmed_count
+                    print_and_log(f"⚠️ Не удалось подтвердить {failed_count} ордеров", "WARNING")
             else:
-                print("❌ Не удалось подтвердить ни одного ордера")
+                print_and_log("❌ Не удалось подтвердить ни одного market ордера", "ERROR")
             
             return confirmed_count > 0
             
         except Exception as e:
-            print(Messages.MARKET_CONFIRMATION_ERROR.format(error=e))
+            print_and_log(f"❌ Ошибка подтверждения market ордеров: {e}", "ERROR")
             return False
     
     def _get_market_confirmations(self, steam_client) -> List[dict]:
@@ -103,11 +97,11 @@ class MarketHandler:
                 return self._get_confirmations_via_guard(steam_client)
             
             else:
-                print("❌ Методы получения подтверждений недоступны")
+                logger.error("❌ Методы получения подтверждений недоступны")
                 return []
                 
         except Exception as e:
-            print(f"❌ Ошибка получения market подтверждений: {e}")
+            logger.error(f"❌ Ошибка получения market подтверждений: {e}")
             return []
     
     def _get_confirmations_via_guard(self, steam_client) -> List[dict]:
@@ -148,13 +142,13 @@ class MarketHandler:
                         })
                         
                 except Exception as e:
-                    print(f"⚠️ Ошибка получения деталей подтверждения {conf.data_confid}: {e}")
+                    logger.warning(f"⚠️ Ошибка получения деталей подтверждения {conf.data_confid}: {e}")
                     continue
             
             return market_confirmations
             
         except Exception as e:
-            print(f"❌ Ошибка получения подтверждений через Guard: {e}")
+            logger.error(f"❌ Ошибка получения подтверждений через Guard: {e}")
             return []
     
     def _is_market_confirmation_by_details(self, details_html: str) -> bool:
@@ -192,7 +186,7 @@ class MarketHandler:
             return False
             
         except Exception as e:
-            print(f"⚠️ Ошибка анализа деталей подтверждения: {e}")
+            logger.warning(f"⚠️ Ошибка анализа деталей подтверждения: {e}")
             return False
     
     def _extract_listing_info(self, details_html: str) -> dict:
@@ -246,7 +240,7 @@ class MarketHandler:
             return info
             
         except Exception as e:
-            print(f"⚠️ Ошибка извлечения информации о листинге: {e}")
+            logger.warning(f"⚠️ Ошибка извлечения информации о листинге: {e}")
             return {'description': 'Market Listing', 'item_name': 'Неизвестный предмет'}
     
     def _is_market_confirmation(self, confirmation) -> bool:
@@ -256,14 +250,14 @@ class MarketHandler:
     
     def _display_confirmations(self, confirmations: List[dict]):
         """Отобразить список подтверждений"""
-        print("📋 Найденные market ордера:")
+        logger.info("📋 Найденные market ордера:")
         for i, conf in enumerate(confirmations, 1):
             conf_id = conf.get('id', 'N/A')
             description = conf.get('description', 'Market Order')
             
             # Компактный формат
-            print(f"  {i:2d}. {description} (ID: {conf_id})")
-        print()
+            logger.info(f"  {i:2d}. {description} (ID: {conf_id})")
+        logger.info("")
     
     def _confirm_market_order(self, steam_client, confirmation_data: dict) -> bool:
         """Подтвердить отдельный market ордер"""
@@ -288,9 +282,9 @@ class MarketHandler:
                 return True
             else:
                 error_message = response.get('error', 'Unknown error') if response else 'No response'
-                print(f"❌ Ошибка подтверждения: {error_message}")
+                logger.error(f"❌ Ошибка подтверждения: {error_message}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Исключение при подтверждении: {e}")
+            logger.error(f"❌ Исключение при подтверждении: {e}")
             return False 

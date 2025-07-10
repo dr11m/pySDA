@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 
 from .constants import Messages
 from .display_formatter import DisplayFormatter
+from src.utils.logger_setup import print_and_log
 
 
 class SettingsManager:
@@ -30,11 +31,11 @@ class SettingsManager:
     def add_mafile(self) -> bool:
         """Добавление mafile через файловый менеджер"""
         try:
-            print(self.formatter.format_section_header("📁 Добавление mafile"))
-            print("ℹ️  Выберите mafile который хотите добавить в систему")
-            print("ℹ️  Файл будет скопирован в папку accounts_info")
-            print("⚠️  ВАЖНО: Имя maFile должно соответствовать реальному никнейму Steam аккаунта!")
-            print()
+            print_and_log(self.formatter.format_section_header("📁 Добавление mafile"))
+            print_and_log("ℹ️  Выберите mafile который хотите добавить в систему")
+            print_and_log("ℹ️  Файл будет скопирован в папку accounts_info")
+            print_and_log("⚠️  ВАЖНО: Имя maFile должно соответствовать реальному никнейму Steam аккаунта!")
+            print_and_log("")
             
             # Определяем операционную систему
             current_os = platform.system().lower()
@@ -43,22 +44,22 @@ class SettingsManager:
                 # Для Windows открываем файловый диалог
                 file_path = self._open_file_dialog_windows()
                 if not file_path:
-                    print("❌ Файл не выбран")
+                    print_and_log("❌ Файл не выбран", "ERROR")
                     return False
             else:
                 # Для Linux/Mac - ручной ввод пути
                 hint_message = Messages.MAFILE_PATH_HINT_LINUX if current_os in ["linux", "darwin"] else Messages.MAFILE_PATH_HINT
-                print(hint_message)
+                print_and_log(hint_message)
                 file_path = input(Messages.ENTER_MAFILE_PATH).strip()
                 
                 if not file_path:
-                    print(self.formatter.format_error("Путь не указан"))
+                    print_and_log(self.formatter.format_error("Путь не указан"), "ERROR")
                     return False
             
             # Проверяем существование файла
             source_path = Path(file_path)
             if not source_path.exists():
-                print(self.formatter.format_error(Messages.MAFILE_NOT_FOUND))
+                print_and_log(self.formatter.format_error(Messages.MAFILE_NOT_FOUND), "ERROR")
                 return False
             
             # Проверяем что это действительно mafile
@@ -81,16 +82,16 @@ class SettingsManager:
             
             # Проверяем не существует ли уже файл
             if destination_path.exists():
-                print(f"⚠️  Файл {destination_name} уже существует в {self.accounts_dir}")
+                print_and_log(f"⚠️  Файл {destination_name} уже существует в {self.accounts_dir}", "WARNING")
                 overwrite = input("Перезаписать существующий файл? (y/n): ").strip().lower()
                 if overwrite not in ['y', 'yes', 'д', 'да']:
-                    print("❌ Операция отменена")
+                    print_and_log("❌ Операция отменена", "ERROR")
                     return False
             
             # Копируем файл
             shutil.copy2(source_path, destination_path)
             
-            print(self.formatter.format_success(
+            print_and_log(self.formatter.format_success(
                 Messages.MAFILE_COPIED.format(destination=destination_path)
             ))
             
@@ -100,7 +101,7 @@ class SettingsManager:
             return True
             
         except Exception as e:
-            print(self.formatter.format_error(Messages.MAFILE_COPY_ERROR.format(error=e)))
+            print_and_log(self.formatter.format_error(Messages.MAFILE_COPY_ERROR.format(error=e)), "ERROR")
             return False
     
     def _validate_mafile(self, file_path: Path) -> bool:
@@ -108,7 +109,7 @@ class SettingsManager:
         try:
             # Проверяем расширение
             if not file_path.name.lower().endswith('.mafile'):
-                print(self.formatter.format_error("Файл должен иметь расширение .maFile"))
+                print_and_log(self.formatter.format_error("Файл должен иметь расширение .maFile"), "ERROR")
                 return False
             
             # Проверяем что это JSON файл с нужными полями
@@ -119,24 +120,24 @@ class SettingsManager:
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
-                print(self.formatter.format_error(
+                print_and_log(self.formatter.format_error(
                     Messages.MAFILE_INVALID.format(
                         error=f"Отсутствуют обязательные поля: {', '.join(missing_fields)}"
                     )
-                ))
+                ), "ERROR")
                 return False
             
             return True
             
         except json.JSONDecodeError as e:
-            print(self.formatter.format_error(
+            print_and_log(self.formatter.format_error(
                 Messages.MAFILE_INVALID.format(error=f"Некорректный JSON: {e}")
-            ))
+            ), "ERROR")
             return False
         except Exception as e:
-            print(self.formatter.format_error(
+            print_and_log(self.formatter.format_error(
                 Messages.MAFILE_INVALID.format(error=str(e))
-            ))
+            ), "ERROR")
             return False
     
     def _read_mafile(self, file_path: Path) -> Optional[Dict[str, Any]]:
@@ -145,25 +146,25 @@ class SettingsManager:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(self.formatter.format_error(f"Ошибка чтения mafile: {e}"))
+            print_and_log(self.formatter.format_error(f"Ошибка чтения mafile: {e}"), "ERROR")
             return None
     
     def _show_mafile_info(self, mafile_data: Dict[str, Any]):
         """Показ информации о mafile"""
-        print()
-        print("📋 Информация о добавленном mafile:")
-        print(f"  👤 Аккаунт: {mafile_data.get('account_name', 'Неизвестно')}")
-        print(f"  🆔 Steam ID: {mafile_data.get('Session', {}).get('SteamID', 'Неизвестно')}")
-        print(f"  🔑 Shared Secret: {'✅ Присутствует' if mafile_data.get('shared_secret') else '❌ Отсутствует'}")
-        print(f"  🔐 Identity Secret: {'✅ Присутствует' if mafile_data.get('identity_secret') else '❌ Отсутствует'}")
-        print()
-        print("💡 Теперь вы можете использовать этот аккаунт в конфигурации")
+        print_and_log("")
+        print_and_log("📋 Информация о добавленном mafile:")
+        print_and_log(f"  👤 Аккаунт: {mafile_data.get('account_name', 'Неизвестно')}")
+        print_and_log(f"  🆔 Steam ID: {mafile_data.get('Session', {}).get('SteamID', 'Неизвестно')}")
+        print_and_log(f"  🔑 Shared Secret: {'✅ Присутствует' if mafile_data.get('shared_secret') else '❌ Отсутствует'}")
+        print_and_log(f"  🔐 Identity Secret: {'✅ Присутствует' if mafile_data.get('identity_secret') else '❌ Отсутствует'}")
+        print_and_log("")
+        print_and_log("💡 Теперь вы можете использовать этот аккаунт в конфигурации")
     
     def _open_file_dialog_windows(self) -> Optional[str]:
         """Открытие файлового диалога в Windows"""
         try:
-            print("🔍 Открываем файловый диалог...")
-            print("ℹ️  Выберите .maFile в открывшемся окне")
+            print_and_log("🔍 Открываем файловый диалог...")
+            print_and_log("ℹ️  Выберите .maFile в открывшемся окне")
             
             # Используем PowerShell для открытия файлового диалога
             powershell_script = '''
@@ -188,14 +189,14 @@ if ($result -eq "OK") {
             
             if result.returncode == 0 and result.stdout.strip():
                 selected_file = result.stdout.strip()
-                print(f"✅ Выбран файл: {selected_file}")
+                print_and_log(f"✅ Выбран файл: {selected_file}")
                 return selected_file
             else:
-                print("❌ Файл не выбран или произошла ошибка")
+                print_and_log("❌ Файл не выбран или произошла ошибка", "ERROR")
                 return None
                 
         except subprocess.TimeoutExpired:
-            print("⏰ Время ожидания истекло (60 сек)")
+            print_and_log("⏰ Время ожидания истекло (60 сек)", "ERROR")
             return None
         except Exception as e:
             print(f"❌ Ошибка открытия файлового диалога: {e}")
@@ -276,23 +277,12 @@ if ($result -eq "OK") {
                 return None
 
             # Получаем Steam клиента через trade_manager
-            steam_client = cli_context.trade_manager.get_steam_client()
+            steam_client = cli_context.trade_manager._get_steam_client()
             if not steam_client:
                 print("❌ Не удалось получить Steam клиента")
                 return None
 
-            # Проверяем API ключ через существующий метод
-            if hasattr(steam_client, 'get_my_apikey'):
-                try:
-                    api_key = steam_client.get_my_apikey()
-                    return api_key
-                except Exception as e:
-                    print(f"⚠️ Метод get_my_apikey недоступен: {e}")
-                    # Пробуем альтернативный способ через веб-интерфейс
-                    return self._get_api_key_from_web(steam_client)
-            else:
-                # Используем альтернативный способ
-                return self._get_api_key_from_web(steam_client)
+            return self._get_api_key_from_web(steam_client)
 
         except Exception as e:
             print(f"❌ Ошибка проверки существующего API ключа: {e}")
@@ -312,23 +302,43 @@ if ($result -eq "OK") {
                 print("❌ Перенаправление на страницу входа. Проверьте cookies.")
                 return None
 
-            # Ищем API ключ на странице
-            data_apikey = re.findall(r"([^\\\n.>\\\t</_=:, $(abcdefghijklmnopqrstuvwxyz )&;-]{32})", req.text)
+            # Ищем API ключ на странице - улучшенный поиск
+            print("🔍 Ищем API ключ на странице...")
             
-            if len(data_apikey) >= 1:
-                apikey = data_apikey[0]
-                return apikey
-            else:
-                # API ключ не найден
-                if 'You must have a validated email address' in req.text:
-                    print(Messages.API_KEY_REQUIRES_EMAIL)
-                    return None
-                elif 'Register for a Steam Web API Key' in req.text:
-                    # Ключ нужно создать
-                    return None
+            # Несколько паттернов для поиска API ключа
+            patterns = [
+                r'<p>Key:\s*([A-F0-9]{32})</p>',  # Ключ в параграфе "Key: ..." - ПРИОРИТЕТНЫЙ
+            ]
+            
+            for i, pattern in enumerate(patterns, 1):
+                matches = re.findall(pattern, req.text, re.IGNORECASE)
+                
+                if matches:
+                    print(f"✅ Найдено {len(matches)} совпадений")
+                    # Фильтруем только валидные API ключи (32 символа, hex)
+                    valid_keys = [key for key in matches if len(key) == 32 and re.match(r'^[A-F0-9]+$', key, re.IGNORECASE)]
+                    
+                    if valid_keys:
+                        apikey = valid_keys[0]
+                        print(f"✅ API ключ найден: {apikey[:10]}...")
+                        return apikey
+                    else:
+                        print("⚠️ Найдены совпадения, но они не похожи на API ключи")
                 else:
-                    print("⚠️ Не удалось определить статус API ключа")
-                    return None
+                    print("❌ Совпадений не найдено")
+            
+            # API ключ не найден
+            if 'You must have a validated email address' in req.text:
+                print(Messages.API_KEY_REQUIRES_EMAIL)
+                return None
+            elif 'Register for a Steam Web API Key' in req.text:
+                # Ключ нужно создать
+                print("ℹ️ API ключ не найден, требуется создание")
+                return None
+            else:
+                print("⚠️ Не удалось определить статус API ключа")
+                print("💡 Проверьте файл debug_apikey_page.html для анализа")
+                return None
 
         except Exception as e:
             print(f"❌ Ошибка получения API ключа через веб: {e}")
@@ -338,7 +348,7 @@ if ($result -eq "OK") {
         """Создание нового API ключа с подтверждением через Guard"""
         try:
             # Получаем Steam клиента
-            steam_client = cli_context.trade_manager.get_steam_client()
+            steam_client = cli_context.trade_manager._get_steam_client()
             if not steam_client:
                 print("❌ Не удалось получить Steam клиента")
                 return None
@@ -388,6 +398,7 @@ if ($result -eq "OK") {
                 return None
 
             sessionid = sessionid_match.group(1)
+            print(f"🔑 Найден sessionid: {sessionid[:10]}...")
 
             # Отправляем POST запрос для создания ключа
             create_data = {
@@ -397,14 +408,37 @@ if ($result -eq "OK") {
                 'Submit': 'Register'
             }
 
+            print("📤 Отправляем запрос на создание API ключа...")
             create_response = steam_client._session.post(
                 'https://steamcommunity.com/dev/registerkey',
                 data=create_data
             )
 
+            print(f"📥 Получен ответ: {create_response.status_code}")
+            
             if create_response.status_code == 200:
-                # Проверяем результат
-                if 'successful' in create_response.text.lower() or 'success' in create_response.text.lower():
+                # Проверяем результат по содержимому HTML
+                response_text = create_response.text.lower()
+                
+                # Проверяем различные индикаторы успеха
+                success_indicators = [
+                    'successful',
+                    'success', 
+                    'api key has been registered',
+                    'your steam web api key',
+                    'key has been created'
+                ]
+                
+                error_indicators = [
+                    'error',
+                    'failed',
+                    'invalid',
+                    'already registered',
+                    'email validation required'
+                ]
+                
+                # Проверяем на успех
+                if any(indicator in response_text for indicator in success_indicators):
                     print("✅ API ключ успешно создан")
                     
                     # Подтверждаем через Guard если требуется
@@ -415,11 +449,24 @@ if ($result -eq "OK") {
                     
                     # Снова запрашиваем страницу чтобы получить ключ
                     return self._get_api_key_from_web(steam_client)
-                else:
-                    print("❌ Не удалось создать API ключ")
+                
+                # Проверяем на ошибки
+                elif any(indicator in response_text for indicator in error_indicators):
+                    print("❌ Ошибка создания API ключа")
+                    if 'email validation required' in response_text:
+                        print("❌ Требуется подтверждение email адреса")
+                    elif 'already registered' in response_text:
+                        print("ℹ️ API ключ уже существует")
+                        return self._get_api_key_from_web(steam_client)
+                    else:
+                        print("❌ Неизвестная ошибка при создании API ключа")
                     return None
+                else:
+                    # Неопределенный результат - пробуем получить ключ
+                    print("⚠️ Неопределенный результат создания, проверяем наличие ключа...")
+                    return self._get_api_key_from_web(steam_client)
             else:
-                print(f"❌ Ошибка создания API ключа: {create_response.status_code}")
+                print(f"❌ Ошибка создания API ключа: HTTP {create_response.status_code}")
                 return None
 
         except Exception as e:

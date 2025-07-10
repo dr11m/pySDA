@@ -1,9 +1,68 @@
 # Steam API настройки
-steam:
-  # если его нет - то через настройки вы всегда сможете сгенерировать его
-  # и уже после сохранить в конфиг
-  api_key: ""
-  username: ""
-  password: ""
-  mafile_path: "accounts_info/username.maFile"
-  steam_id: ""
+
+# Минимальная задержка между любыми запросами к Steam (в миллисекундах).
+# Гарантирует, что бот не будет слишком часто отправлять запросы,
+# даже если проверка нескольких аккаунтов выпадет на одно время.
+# 1000ms = 1 секунда. Рекомендуется не ставить меньше 500.
+min_request_delay_ms: 1000
+
+# Отладочные настройки
+# Если True - логи выводятся в консоль, если False - только в файл
+# Полезно для отладки, но может замедлить работу в продакшене
+debug_console_output: false
+
+
+#               Настройки для конкретных аккаунтов.
+# Имя аккаунта (например, 'my_account_1') должно совпадать с именем maFile (без расширения).
+accounts:
+  default:
+    username: ""
+    password: ""
+    mafile_path: "accounts_info/username.maFile"
+    steam_id: ""
+      # если его нет - то через настройки вы всегда сможете сгенерировать его через бота и сохранить сюда
+    api_key: ""
+
+
+#               Настройки Провайдеров Данных
+# Здесь вы можете выбрать реализации для хранения cookies и получения прокси.
+# Пользователь может создать свою реализацию и указать путь к ней.
+
+#               Настройки хранилища cookies
+cookie_storage:
+  # --- Стандартная реализация (хранение в JSON файлах) ---
+  # Не требует дополнительных зависимостей или настроек.
+  # Файлы будут храниться в папке 'json_cookies' в корне проекта.
+  module_path: "src.implementations.cookie_storage.json_storage"
+  class_name: "JsonCookieStorage"
+  
+  # --- Реализация через SQLAlchemy (требует .env файла) ---
+  # Создайте .env файл на основе src/implementations/cookie_storage/sql_storage/env.example
+  # module_path: "src.implementations.cookie_storage.sql_storage"
+  # class_name: "SqlAlchemyCookieStorage"
+
+
+#               Настройки провайдера прокси
+proxy_provider:
+  # --- Стандартная реализация (получение прокси из proxies.json) ---
+  module_path: "src.implementations.proxy_storage.json_proxy"
+  class_name: "JsonProxyProvider"
+  
+  # --- Реализация через SQLAlchemy (требует .env файла) ---
+  # Создайте .env файл на основе src/implementations/proxy_storage/sql_proxy/env.example
+  # module_path: "src.implementations.proxy_storage.sql_proxy"
+  # class_name: "SqlAlchemyProxyProvider"
+
+
+#               Настройки Уведомлений
+notification_provider:
+  # --- Стандартная реализация (уведомления через логгер) ---
+  # Не требует дополнительных настроек
+  module_path: "src.implementations.notifications.logger_notification"
+  class_name: "LoggerNotification"
+  
+  # --- Уведомления через Telegram (требует .env файла) ---
+  # Создайте .env файл на основе src/implementations/env.example
+  # module_path: "src.implementations.notifications.telegram_notification"
+  # class_name: "TelegramNotification"
+

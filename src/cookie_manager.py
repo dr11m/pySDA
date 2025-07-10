@@ -1,55 +1,43 @@
 #!/usr/bin/env python3
 """
-Cookie Manager - Модуль-синглтон для управления Steam cookies
+Cookie Manager - Модуль для управления Steam cookies для конкретного аккаунта
 """
 
 import os
 import time
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
-from threading import Lock
-
 from src.utils.logger_setup import logger
 from src.steampy.client import SteamClient
-from src.interfaces.storage_interface import CookieStorageInterface, FileCookieStorage
+from src.interfaces.storage_interface import CookieStorageInterface as StorageInterface
+from src.utils.delayed_http_adapter import DelayedHTTPAdapter
+from src.utils.cookies_and_session import session_to_dict
 
 
 class CookieManager:
-    """Синглтон для управления Steam cookies"""
-    
-    _instance: Optional['CookieManager'] = None
-    _lock = Lock()
-    
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
+    """Менеджер для управления Steam cookies для конкретного аккаунта"""
     
     def __init__(self, 
                  username: str = None,
                  password: str = None,
                  mafile_path: str = None,
                  steam_id: str = None,
-                 storage: CookieStorageInterface = None,
+                 storage: StorageInterface = None,
                  accounts_dir: str = "accounts_info",
-                 proxy_manager=None):
-        
-        # Предотвращаем повторную инициализацию
-        if hasattr(self, '_initialized'):
-            return
+                 proxy: Optional[Dict[str, str]] = None,
+                 request_delay_sec: float = 0):
         
         self.username = username
         self.password = password
         self.mafile_path = mafile_path
         self.steam_id = steam_id
-        self.proxy_manager = proxy_manager
+        self.proxy = proxy
+        self.request_delay_sec = request_delay_sec  # Сохраняем задержку
         
         # Инициализация хранилища
-        self.storage = storage or FileCookieStorage(accounts_dir)
+        self.storage = storage
         
         # Папка для сессий steampy
         self.accounts_dir = Path(accounts_dir)
@@ -61,29 +49,29 @@ class CookieManager:
         self.last_update: Optional[datetime] = None
         self.cookies_cache: Optional[Dict[str, str]] = None
         
-        self._initialized = True
+        # Создаем SteamClient здесь, как и было раньше
+        self.client = SteamClient(
+            username=username,
+            password=password,
+            steam_guard=mafile_path,
+            steam_id=steam_id,
+            proxies=proxy
+        )
+
+        # И здесь же монтируем адаптер, если это необходимо
+        if request_delay_sec > 0:
+            adapter = DelayedHTTPAdapter(delay=request_delay_sec)
+            self.client._session.mount('http://', adapter)
+            self.client._session.mount('https://', adapter)
+            logger.debug(f"Для клиента '{username}' установлен HTTP адаптер с задержкой {request_delay_sec:.2f} сек.")
         
         logger.info(f"🍪 Cookie Manager инициализирован для {username}")
         logger.info(f"📁 Сессии: {self.session_file}")
         logger.info(f"📄 MaFile: {mafile_path}")
+        if self.proxy:
+            logger.info(f"🌐 Используется прокси: {self.proxy.get('http')}")
     
-    def session_to_dict(self, session) -> Dict[str, str]:
-        """Преобразование сессии в словарь cookies"""
-        try:
-            if hasattr(session, 'cookies'):
-                if hasattr(session.cookies, 'get_dict'):
-                    # requests.cookies.RequestsCookieJar
-                    return session.cookies.get_dict()
-                else:
-                    # Другие типы cookie jar
-                    cookies = {}
-                    for cookie in session.cookies:
-                        cookies[cookie.name] = cookie.value
-                    return cookies
-            return {}
-        except Exception as e:
-            logger.error(f"Ошибка преобразования сессии в словарь: {e}")
-            return {}
+
     
     def dict_to_session_cookies(self, cookies_dict: Dict[str, str], session) -> bool:
         """Загрузка cookies из словаря в сессию"""
@@ -96,59 +84,24 @@ class CookieManager:
             logger.error(f"Ошибка загрузки cookies в сессию: {e}")
             return False
     
-    def _get_proxy_for_client(self) -> Optional[Dict[str, str]]:
-        """Получение прокси для Steam клиента"""
-        if not self.proxy_manager:
-            return None
-        
-        try:
-            current_proxy = self.proxy_manager.get_current_proxy()
-            if not current_proxy:
-                logger.error("Нет доступных прокси")
-                return None
-            
-            proxy_dict = self.proxy_manager.proxy_to_dict(current_proxy)
-            logger.info(f"🌐 Используем прокси: {self.proxy_manager.proxy_to_key(current_proxy)}")
-            return proxy_dict
-        except Exception as e:
-            logger.error(f"Ошибка получения прокси: {e}")
-            return None
-    
-    def _handle_proxy_ban(self) -> bool:
-        """Обработка бана прокси и переключение на следующий"""
-        if not self.proxy_manager:
-            return False
-        
-        try:
-            current_proxy = self.proxy_manager.get_current_proxy()
-            if current_proxy:
-                logger.warning(f"🚫 Баним текущий прокси: {self.proxy_manager.proxy_to_key(current_proxy)}")
-                self.proxy_manager.ban_proxy(current_proxy, ban_duration_minutes=30)
-            
-            next_proxy = self.proxy_manager.rotate_to_next_proxy()
-            if next_proxy:
-                logger.info(f"🔄 Переключились на прокси: {self.proxy_manager.proxy_to_key(next_proxy)}")
-                return True
-            else:
-                logger.error("🚫 Нет доступных прокси для переключения")
-                return False
-        except Exception as e:
-            logger.error(f"Ошибка обработки бана прокси: {e}")
-            return False
-    
     def _create_steam_client(self) -> Optional[SteamClient]:
         """Создание Steam клиента с прокси"""
         try:
-            proxies = self._get_proxy_for_client() if self.proxy_manager else None
-            
             steam_client = SteamClient(
                 session_path=str(self.session_file),
                 username=self.username,
                 password=self.password,
                 steam_id=self.steam_id,
                 steam_guard=self.mafile_path,
-                proxies=proxies
+                proxies=self.proxy
             )
+            
+            # Устанавливаем HTTP адаптер с задержкой если она настроена
+            if hasattr(self, 'request_delay_sec') and self.request_delay_sec > 0:
+                adapter = DelayedHTTPAdapter(delay=self.request_delay_sec)
+                steam_client._session.mount('http://', adapter)
+                steam_client._session.mount('https://', adapter)
+                logger.debug(f"Для нового Steam клиента '{self.username}' установлен HTTP адаптер с задержкой {self.request_delay_sec:.2f} сек.")
             
             logger.info("✅ Steam клиент создан")
             return steam_client
@@ -216,13 +169,11 @@ class CookieManager:
             except Exception as e:
                 logger.error(f"❌ Ошибка входа (попытка {attempt + 1}): {e}")
                 
-                # Проверяем, связана ли ошибка с прокси
+                # Упрощенная обработка ошибок без смены прокси
                 error_str = str(e).lower()
                 if any(keyword in error_str for keyword in ['429', 'too many requests', 'proxy', 'connection']):
-                    if self.proxy_manager and attempt < max_retries - 1:
-                        logger.info("🔄 Ошибка связана с прокси, пробуем переключиться...")
-                        if self._handle_proxy_ban():
-                            continue
+                    logger.warning("Проблема с соединением или прокси. Повторная попытка через некоторое время...")
+                    time.sleep(5) # Пауза перед следующей попыткой
                 
                 if attempt == max_retries - 1:
                     logger.debug(traceback.format_exc())
@@ -238,7 +189,15 @@ class CookieManager:
             logger.info("🔄 Cookies никогда не обновлялись")
             return False
         
-        time_passed = datetime.now() - last_update
+        # Приводим оба времени к UTC для корректного сравнения
+        now_utc = datetime.now(timezone.utc)
+        if last_update.tzinfo is None:
+            # Если last_update без timezone, считаем что это UTC
+            last_update_utc = last_update.replace(tzinfo=timezone.utc)
+        else:
+            last_update_utc = last_update.astimezone(timezone.utc)
+        
+        time_passed = now_utc - last_update_utc
         max_age = timedelta(minutes=max_age_minutes)
         
         if time_passed > max_age:
@@ -253,12 +212,6 @@ class CookieManager:
             logger.info("🔄 Cookies не найдены в хранилище")
             return False
         
-        # Проверяем ключевые cookies
-        required_cookies = ['sessionid', 'steamLoginSecure']
-        for cookie_name in required_cookies:
-            if cookie_name not in self.cookies_cache:
-                logger.info(f"❌ Отсутствует обязательный cookie: {cookie_name}")
-                return False
         
         logger.info(f"✅ Cookies актуальны (возраст: {int(time_passed.total_seconds() // 60)} минут)")
         return True
@@ -287,19 +240,12 @@ class CookieManager:
                 return None
             
             # Получаем cookies из сессии
-            cookies = self.session_to_dict(self.steam_client._session)
+            cookies = session_to_dict(self.steam_client._session)
             if not cookies:
                 logger.error("❌ Не удалось получить cookies из сессии")
                 return None
             
             logger.info(f"🍪 Получено {len(cookies)} cookies")
-            
-            # Показываем важные cookies
-            important = ['sessionid', 'steamLoginSecure']
-            for cookie_name in important:
-                if cookie_name in cookies:
-                    value = cookies[cookie_name][:20] + "..." if len(cookies[cookie_name]) > 20 else cookies[cookie_name]
-                    logger.info(f"   {cookie_name}: {value}")
             
             # Сохраняем cookies в хранилище
             if self.storage.save_cookies(self.username, cookies):
@@ -307,7 +253,7 @@ class CookieManager:
                 self.cookies_cache = cookies
                 self.last_update = datetime.now()
             else:
-                logger.warning("⚠️ Не удалось сохранить cookies в хранилище")
+                raise Exception("Не удалось сохранить cookies в хранилище")
             
             return cookies
             
@@ -399,34 +345,27 @@ class CookieManager:
         logger.info("🧹 Кэш cookies очищен")
 
 
-# Глобальный экземпляр (будет создан при первом импорте)
-_cookie_manager_instance: Optional[CookieManager] = None
-
-
-def get_cookie_manager(**kwargs) -> CookieManager:
-    """Получение глобального экземпляра Cookie Manager"""
-    global _cookie_manager_instance
-    
-    if _cookie_manager_instance is None:
-        _cookie_manager_instance = CookieManager(**kwargs)
-    
-    return _cookie_manager_instance
-
-
-def initialize_cookie_manager(username: str, password: str, mafile_path: str, 
-                            steam_id: str = None, storage: CookieStorageInterface = None,
-                            accounts_dir: str = "accounts_info", proxy_manager=None) -> CookieManager:
-    """Инициализация глобального Cookie Manager"""
-    global _cookie_manager_instance
-    
-    _cookie_manager_instance = CookieManager(
+def initialize_cookie_manager(
+    username: str,
+    password: str,
+    mafile_path: str,
+    steam_id: str,
+    storage: StorageInterface,
+    accounts_dir: str = 'accounts_info',
+    proxy: Optional[Dict[str, str]] = None,
+    request_delay_sec: float = 0
+) -> "CookieManager":
+    """
+    Фабричная функция для создания или получения существующего экземпляра CookieManager.
+    """
+    # Просто создаем и возвращаем новый экземпляр со всеми параметрами.
+    return CookieManager(
         username=username,
-        password=password, 
+        password=password,
         mafile_path=mafile_path,
         steam_id=steam_id,
         storage=storage,
         accounts_dir=accounts_dir,
-        proxy_manager=proxy_manager
-    )
-    
-    return _cookie_manager_instance 
+        proxy=proxy,
+        request_delay_sec=request_delay_sec
+    ) 

@@ -1,0 +1,6 @@
+{
+  "your_steam_account_name_1": "http://user:password@host:port",
+  "your_steam_account_name_2": "https://host:port",
+  "account_without_proxy": "no_proxy",
+  "another_account_without_proxy": null
+} 
