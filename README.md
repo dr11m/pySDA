@@ -76,14 +76,14 @@ accounts:
 2. Переименуйте в формат `ваш_логин.maFile`
 
 **Вариант 2 - Через бот:**
-1. Запустите бот: `uv run python main.py`
+1. Запустите бот: `uv run python cli.py`
 2. Перейдите в `⚙️ Настройки` → `📁 Добавить mafile`
 3. Укажите путь к вашему .maFile
 
 ### 5️⃣ **Запуск**
 
 ```bash
-uv run python main.py
+uv run python cli.py
 ```
 
 ---
@@ -221,7 +221,7 @@ uv run python main.py
 
 ```
 pySDA/
-├── 🚀 main.py                     # Точка входа приложения
+├── 🚀 cli.py                    # Точка входа приложения
 ├── ⚙️ config.yaml               # Конфигурация аккаунта
 ├── 📁 accounts_info/            # Данные аккаунтов
 │   ├── username.maFile          # Steam Guard файл
@@ -239,6 +239,15 @@ pySDA/
 │   │   ├── proxy_storage/       # Управление прокси
 │   │   └── notifications/       # Система уведомлений
 │   └── 🔥 steampy/              # Steam API библиотека
+├── 🧪 tests/                    # Новые тесты
+│   ├── test_error_tracking.py   # Тестирование системы ошибок
+│   ├── test_proxy_connection.py # Тестирование прокси
+│   └── demo_error_tracking.py   # Демо системы ошибок
+├── 🔥 tests_steampy/            # Тесты Steam API
+│   ├── test_client.py           # Тесты клиента
+│   ├── test_guard.py            # Тесты Guard
+│   ├── test_market.py           # Тесты маркета
+│   └── test_utils.py            # Тесты утилит
 └── 📋 pyproject.toml            # Конфигурация проекта
 ```
 
@@ -291,7 +300,7 @@ pySDA/
 ### 🛠️ **Техническая часть**
 
 #### 💾 **Интерфейс хранения cookies** ✅
-- [x] Улучшить логирование (обычное + ошибки), внедрить везде loguru, не сломав print для работы через main.py
+- [x] Улучшить логирование (обычное + ошибки), внедрить везде loguru, не сломав print для работы через cli.py
 - [x] Абстрактный интерфейс для различных storage систем
 - [x] Реализация SQLite storage для интеграции
 - [x] Пример интеграции с внешними проектами
@@ -331,21 +340,33 @@ class SQLiteCookieStorage(CookieStorageInterface):
 Проект включает набор unit-тестов для проверки основного функционала:
 
 ```bash
-# Запуск всех тестов
-uv run python -m pytest test/
+# Запуск всех тестов (включая новые тесты)
+uv run python -m pytest tests/ tests_steampy/
+
+# Запуск только новых тестов
+uv run python -m pytest tests/
+
+# Запуск только тестов steampy
+uv run python -m pytest tests_steampy/
 
 # Запуск конкретного теста
-uv run python -m pytest test/test_client.py
+uv run python -m pytest tests_steampy/test_client.py
 
 # Запуск с детальным выводом
-uv run python -m pytest test/ -v
+uv run python -m pytest tests/ tests_steampy/ -v
 
 # Запуск с покрытием кода
-uv run python -m pytest test/ --cov=src
+uv run python -m pytest tests/ tests_steampy/ --cov=src
 ```
 
 ### 📋 **Доступные тесты**
 
+#### 🆕 **Новые тесты** (`tests/`)
+- **`test_error_tracking.py`** - Тестирование системы отслеживания ошибок
+- **`test_proxy_connection.py`** - Тестирование подключения к прокси
+- **`demo_error_tracking.py`** - Демонстрация системы отслеживания ошибок
+
+#### 🔥 **Тесты Steam API** (`tests_steampy/`)
 - **`test_client.py`** - Тестирование основного Steam клиента
 - **`test_guard.py`** - Тестирование Steam Guard функционала
 - **`test_market.py`** - Тестирование работы с торговой площадкой
@@ -354,14 +375,14 @@ uv run python -m pytest test/ --cov=src
 ### 🔧 **Запуск отдельных тест-модулей**
 
 ```bash
-# Тестирование Steam Guard
-uv run python -m pytest test/test_guard.py -v
+# Тестирование новых функций
+uv run python -m pytest tests/test_error_tracking.py -v
+uv run python -m pytest tests/test_proxy_connection.py -v
 
-# Тестирование маркета
-uv run python -m pytest test/test_market.py -v
-
-# Тестирование утилит
-uv run python -m pytest test/test_utils.py -v
+# Тестирование Steam API
+uv run python -m pytest tests_steampy/test_guard.py -v
+uv run python -m pytest tests_steampy/test_market.py -v
+uv run python -m pytest tests_steampy/test_utils.py -v
 ```
 
 ### 📊 **Покрытие кода**
@@ -373,7 +394,7 @@ uv run python -m pytest test/test_utils.py -v
 uv add --dev pytest-cov
 
 # Запуск с отчетом покрытия
-uv run python -m pytest test/ --cov=src --cov-report=html
+uv run python -m pytest tests/ tests_steampy/ --cov=src --cov-report=html
 
 # Просмотр отчета (создается папка htmlcov/)
 # Откройте htmlcov/index.html в браузере
