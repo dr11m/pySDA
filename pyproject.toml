@@ -20,6 +20,9 @@ dependencies = [
     "steampy>=1.2.0",
     "pydantic>=2.0.0",
     "loguru>=0.7.3",
+    "sqlalchemy>=2.0.41",
+    "psycopg2-binary>=2.9.10",
+    "ruamel-yaml>=0.18.14",
 ]
 
 [project.optional-dependencies]

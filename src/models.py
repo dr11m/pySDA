@@ -5,6 +5,7 @@ Pydantic модели для Steam API ответов
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from enum import IntEnum
+from dataclasses import dataclass
 
 
 class TradeOfferState(IntEnum):
@@ -160,9 +161,9 @@ class TradeOffersResponse(BaseModel):
         return len(self.confirmation_needed_received) + len(self.confirmation_needed_sent)
 
 
-class SteamApiResponse(BaseModel):
-    """Базовый ответ Steam API"""
-    response: TradeOffersResponse
+@dataclass
+class SteamApiResponse:
+    success: bool
 
 
 class TradeOffersSummaryResponse(BaseModel):

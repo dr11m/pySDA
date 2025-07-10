@@ -8,30 +8,27 @@ import time
 import traceback
 from datetime import datetime
 from enum import Enum
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from urllib.parse import unquote
 
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, print_and_log
 from src.steampy.client import SteamClient
 from src.steampy.guard import generate_one_time_code, generate_confirmation_key, load_steam_guard
 from src.models import TradeOffersResponse, TradeOffer, TradeOfferState, SteamApiResponse
-from src.cookie_manager import get_cookie_manager
-
-
-class ConfirmationType(Enum):
-    """Типы подтверждений Steam"""
-    TRADE = "trade"
-    MARKET_SELL = "sell"
-    UNKNOWN = "unknown"
+from src.cookie_manager import CookieManager
+from src.steampy.confirmation import Confirmation, ConfirmationExecutor
+from src.steampy.models import ConfirmationType
 
 
 class TradeConfirmationManager:
     """Менеджер для работы с трейдами и подтверждениями"""
     
-    def __init__(self, username: str, mafile_path: str, cookie_manager=None):
+    def __init__(self, username: str, mafile_path: str, cookie_manager: CookieManager, api_key: Optional[str] = None):
         self.username = username
         self.mafile_path = mafile_path
-        self.cookie_manager = cookie_manager or get_cookie_manager()
+        self.cookie_manager = cookie_manager
+        self._steam_client: Optional[SteamClient] = None
+        self._api_key = api_key
         
         # Загружаем данные Steam Guard
         try:
@@ -43,9 +40,17 @@ class TradeConfirmationManager:
         
         logger.info(f"🔄 Trade Confirmation Manager инициализирован для {username}")
     
-    def get_steam_client(self) -> Optional[SteamClient]:
-        """Получение Steam клиента с актуальными cookies"""
-        return self.cookie_manager.get_steam_client()
+    def _get_steam_client(self) -> SteamClient:
+        """Получает или создает экземпляр SteamClient."""
+        if self._steam_client and hasattr(self._steam_client, 'was_login_executed') and self._steam_client.was_login_executed:
+            return self._steam_client
+
+        # Получаем готовый клиент из CookieManager
+        self._steam_client = self.cookie_manager.get_steam_client()
+        if not self._steam_client:
+            raise Exception("Не удалось получить настроенный Steam клиент из CookieManager.")
+
+        return self._steam_client
     
     def generate_guard_code(self) -> str:
         """Генерация кода мобильного аутентификатора"""
@@ -63,60 +68,38 @@ class TradeConfirmationManager:
     def get_trade_offers(self, active_only: bool = True, use_webtoken: bool = True) -> Optional[TradeOffersResponse]:
         """Получение трейд офферов"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("❌ Не удалось получить Steam клиента")
-                return None
+            steam_client = self._get_steam_client()
             
             logger.info("🔍 Получаем трейд офферы...")
             
-            # Получаем API ключ если его нет
-            if not steam_client._api_key:
-                logger.info("🔑 Получаем API ключ...")
-                
-                try:
-                    # Проверяем наличие метода
-                    if hasattr(steam_client, 'get_my_apikey'):
-                        try:
-                            api_key = steam_client.get_my_apikey()
-                            if api_key:
-                                steam_client._api_key = api_key
-                                logger.info(f"API ключ получен: {api_key[:10]}...")
-                            else:
-                                logger.warning("Метод get_my_apikey вернул пустой результат")
-                                # Сразу пробуем через веб-интерфейс
-                                api_key = self._get_api_key_from_web(steam_client)
-                                if api_key:
-                                    steam_client._api_key = api_key
-                                    logger.info(f"API ключ получен через веб: {api_key[:10]}...")
-                                else:
-                                    logger.error("Не удалось получить API ключ")
-                                    return None
-                        except Exception as steampy_error:
-                            logger.warning(f"Ошибка в get_my_apikey: {steampy_error}")
-                            # Пробуем через веб-интерфейс как fallback
-                            logger.info("Пробуем получить API ключ через веб-интерфейс...")
-                            api_key = self._get_api_key_from_web(steam_client)
-                            if api_key:
-                                steam_client._api_key = api_key
-                                logger.info(f"API ключ получен через веб: {api_key[:10]}...")
-                            else:
-                                logger.error("Не удалось получить API ключ")
-                                return None
-                    else:
-                        logger.warning("Метод get_my_apikey не найден в steampy")
-                        # Пробуем через веб-интерфейс
+            # Получаем API ключ только если не используем webtoken
+            if not use_webtoken:
+                # Приоритет: 1) API ключ из конфига, 2) существующий в клиенте, 3) получение автоматически
+                if self._api_key:
+                    # API ключ из конфига имеет высший приоритет
+                    logger.info(f"🔑 Используем API ключ из конфига: {self._api_key[:10]}...")
+                    steam_client._api_key = self._api_key
+                elif steam_client._api_key:
+                    # Если нет ключа в конфиге, но есть в клиенте - используем его
+                    logger.info(f"🔑 Используем существующий API ключ: {steam_client._api_key[:10]}...")
+                else:
+                    # Если нет ключа нигде - получаем автоматически
+                    logger.info("🔑 Получаем API ключ автоматически...")
+                    
+                    try:
+                        # Пробуем получить через веб-интерфейс (самый надежный способ)
                         api_key = self._get_api_key_from_web(steam_client)
                         if api_key:
                             steam_client._api_key = api_key
-                            logger.info(f"API ключ получен через веб: {api_key[:10]}...")
+                            logger.info(f"API ключ получен: {api_key[:10]}...")
                         else:
                             logger.error("Не удалось получить API ключ")
                             return None
-                            
-                except Exception as get_error:
-                    logger.error(f"Критическая ошибка получения API ключа: {get_error}")
-                    return None
+                    except Exception as e:
+                        logger.error(f"Ошибка получения API ключа: {e}")
+                        return None
+            else:
+                logger.info("🔑 Используем access_token из cookies (webtoken)")
             
             # Получаем access_token если нужен
             access_token = None
@@ -142,9 +125,8 @@ class TradeConfirmationManager:
             api_response = steam_client.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', params)
             response_data = api_response.json()
             
-            # Парсим ответ
-            steam_response = SteamApiResponse(**response_data)
-            trade_offers = steam_response.response
+            # Парсим ответ напрямую как TradeOffersResponse
+            trade_offers = TradeOffersResponse(**response_data.get('response', {}))
             
             logger.info(f"✅ Получено трейд офферов:")
             logger.info(f"  - Входящие всего: {len(trade_offers.trade_offers_received)}")
@@ -302,33 +284,47 @@ class TradeConfirmationManager:
     def get_confirmations(self) -> List[Dict[str, Any]]:
         """Получение списка подтверждений"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("❌ Не удалось получить Steam клиента")
-                return []
+            steam_client = self._get_steam_client()
             
             logger.info("🔍 Получаем подтверждения мобильного аутентификатора...")
             
-            # Используем правильный метод steampy для получения подтверждений
-            if hasattr(steam_client, 'get_confirmations'):
-                confirmations = steam_client.get_confirmations()
+            # Проверяем наличие steam_guard для работы с подтверждениями
+            if not hasattr(steam_client, 'steam_guard') or not steam_client.steam_guard:
+                logger.warning("⚠️ Steam Guard не настроен, невозможно получить подтверждения")
+                return []
+            
+            # Создаем ConfirmationExecutor для работы с подтверждениями
+            from .steampy.confirmation import ConfirmationExecutor
+            
+            confirmation_executor = ConfirmationExecutor(
+                identity_secret=steam_client.steam_guard['identity_secret'],
+                my_steam_id=steam_client.steam_id,
+                session=steam_client._session
+            )
+            
+            # Получаем подтверждения через ConfirmationExecutor
+            confirmations = confirmation_executor._get_confirmations()
+            
+            if confirmations:
+                logger.info(f"✅ Найдено {len(confirmations)} подтверждений")
                 
-                if confirmations:
-                    logger.info(f"✅ Найдено {len(confirmations)} подтверждений")
+                # Преобразуем в формат словарей для совместимости
+                confirmations_data = []
+                for i, conf in enumerate(confirmations, 1):
+                    conf_data = {
+                        'id': conf.data_confid,
+                        'nonce': conf.nonce,
+                        'creator_id': conf.creator_id,
+                        'type': 'unknown'  # Тип будет определен позже при необходимости
+                    }
+                    confirmations_data.append(conf_data)
                     
-                    # Выводим информацию о подтверждениях
-                    for i, conf in enumerate(confirmations, 1):
-                        conf_id = getattr(conf, 'id', getattr(conf, 'conf_id', 'N/A'))
-                        conf_type = getattr(conf, 'type', getattr(conf, 'conf_type', 'N/A'))
-                        creation_time = getattr(conf, 'creation_time', getattr(conf, 'time', 'N/A'))
-                        
-                        logger.info(f"  {i}. ID: {conf_id}, Тип: {conf_type}, Создано: {creation_time}")
-                else:
-                    logger.info("ℹ️ Подтверждений не найдено")
+                    logger.info(f"  {i}. ID: {conf.data_confid}, Creator ID: {conf.creator_id}")
                 
-                return confirmations or []
+                return confirmations_data
             else:
-                logger.error("❌ Метод get_confirmations не найден в steampy")
+                logger.info("ℹ️ Подтверждений не найдено")
+                print_and_log("ℹ️ Подтверждений не найдено")
                 return []
                 
         except Exception as e:
@@ -339,10 +335,7 @@ class TradeConfirmationManager:
     def accept_trade_offer(self, trade_offer_id: str) -> bool:
         """Принятие трейд оффера через steampy клиент (только веб-принятие, без Guard)"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("Не удалось получить Steam клиента")
-                return False
+            steam_client = self._get_steam_client()
             
             logger.info(f"Принимаем трейд оффер в веб-интерфейсе: {trade_offer_id}")
             
@@ -371,10 +364,7 @@ class TradeConfirmationManager:
     def accept_trade_offer_with_confirmation(self, trade_offer_id: str) -> bool:
         """Принятие трейд оффера через steampy клиент с автоматическим подтверждением через Guard"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("Не удалось получить Steam клиента")
-                return False
+            steam_client = self._get_steam_client()
             
             logger.info(f"Принимаем трейд оффер с автоподтверждением: {trade_offer_id}")
             
@@ -399,10 +389,7 @@ class TradeConfirmationManager:
     def confirm_accepted_trade_offer(self, trade_offer_id: str) -> bool:
         """Подтверждение уже принятого трейд оффера через Steam Guard"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("❌ Не удалось получить Steam клиента")
-                return False
+            steam_client = self._get_steam_client()
             
             logger.info(f"🔑 Подтверждаем уже принятый трейд оффер через Guard: {trade_offer_id}")
             
@@ -425,10 +412,7 @@ class TradeConfirmationManager:
     def decline_trade_offer(self, trade_offer_id: str) -> bool:
         """Отклонение трейд оффера"""
         try:
-            steam_client = self.get_steam_client()
-            if not steam_client:
-                logger.error("❌ Не удалось получить Steam клиента")
-                return False
+            steam_client = self._get_steam_client()
             
             logger.info(f"❌ Отклоняем трейд оффер: {trade_offer_id}")
             
@@ -497,6 +481,7 @@ class TradeConfirmationManager:
             
             if not free_trades:
                 logger.info("ℹ️ Бесплатных трейдов не найдено")
+                print_and_log("ℹ️ Бесплатных трейдов не найдено")
                 return stats
             
             logger.info(f"🎁 Найдено {len(free_trades)} бесплатных трейдов")
@@ -584,6 +569,7 @@ class TradeConfirmationManager:
             
             if not confirmation_needed_trades:
                 logger.info("ℹ️ Трейдов, требующих подтверждения, не найдено")
+                print_and_log("ℹ️ Трейдов, требующих подтверждения, не найдено")
                 return stats
             
             logger.info(f"🔑 Найдено {len(confirmation_needed_trades)} трейдов, требующих подтверждения")
