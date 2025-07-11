@@ -110,20 +110,27 @@ class TradeConfirmationManager:
                     use_webtoken = False
             
             # Подготавливаем параметры
-            params = {
-                'key' if not use_webtoken else 'access_token': steam_client._api_key if not use_webtoken else access_token,
+            params = {}
+            if use_webtoken:
+                params['access_token'] = access_token
+            else:
+                params['key'] = steam_client._api_key
+            
+            params.update({
                 'get_sent_offers': 1,
                 'get_received_offers': 1,
                 'get_descriptions': 1,
                 'language': 'english',
-                'active_only': int(active_only),
+                'active_only': 1 if active_only else 0,
                 'historical_only': 0,
                 'time_historical_cutoff': ''
-            }
+            })
             
             # Делаем запрос к API
             api_response = steam_client.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', params)
             response_data = api_response.json()
+            
+
             
             # Парсим ответ напрямую как TradeOffersResponse
             trade_offers = TradeOffersResponse(**response_data.get('response', {}))
@@ -167,11 +174,6 @@ class TradeConfirmationManager:
             logger.info(f"Найдено потенциальных ключей: {len(data_apikey)}")
             if data_apikey:
                 logger.info(f"Найденные ключи: {data_apikey}")
-            
-            # Сохраняем HTML для диагностики
-            with open('debug_apikey_page.html', 'w', encoding='utf-8') as f:
-                f.write(req.text)
-            logger.info("HTML страницы сохранен в debug_apikey_page.html")
             
             if len(data_apikey) == 1:
                 apikey = data_apikey[0]
@@ -332,17 +334,23 @@ class TradeConfirmationManager:
             logger.debug(traceback.format_exc())
             return []
     
-    def accept_trade_offer(self, trade_offer_id: str) -> bool:
+    def accept_trade_offer(self, trade_offer_id: str, partner_account_id: str = None) -> bool:
         """Принятие трейд оффера через steampy клиент (только веб-принятие, без Guard)"""
         try:
             steam_client = self._get_steam_client()
             
             logger.info(f"Принимаем трейд оффер в веб-интерфейсе: {trade_offer_id}")
             
-            # Используем новый метод steampy для принятия трейда БЕЗ автоматического подтверждения
-            result = steam_client.accept_trade_offer(trade_offer_id)
+            # Используем оптимизированный метод если у нас есть partner_account_id
+            if partner_account_id:
+                result = steam_client.accept_trade_offer_optimized(trade_offer_id, partner_account_id)
+            else:
+                result = steam_client.accept_trade_offer(trade_offer_id)
             
-            if result.get('tradeid'):
+            if result is None:
+                logger.error(f"Трейд оффер {trade_offer_id}: Получен пустой ответ от Steam")
+                return False
+            elif result.get('tradeid'):
                 logger.info(f"Трейд оффер {trade_offer_id} успешно принят в веб-интерфейсе (Trade ID: {result['tradeid']})")
                 return True
             elif result.get('needs_mobile_confirmation'):
@@ -490,9 +498,11 @@ class TradeConfirmationManager:
             for offer in free_trades:
                 try:
                     if auto_accept:
-                        # Шаг 1: Принимаем трейд в веб-интерфейсе
+                        # Шаг 1: Принимаем трейд в веб-интерфейсе (оптимизированно)
                         logger.info(f"🌐 Принимаем в веб-интерфейсе: {offer.tradeofferid}")
-                        if self.accept_trade_offer(offer.tradeofferid):
+                        # Используем partner_account_id для оптимизации (убираем лишние GET запросы)
+                        partner_account_id = str(offer.accountid_other)
+                        if self.accept_trade_offer(offer.tradeofferid, partner_account_id):
                             stats['accepted_trades'] += 1
                             logger.info(f"✅ Принят в веб-интерфейсе бесплатный трейд: {offer.tradeofferid}")
                             

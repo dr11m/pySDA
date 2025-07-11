@@ -272,12 +272,12 @@ if ($result -eq "OK") {
         """Проверка наличия существующего API ключа"""
         try:
             # Проверяем cookies перед выполнением запроса
-            if not cli_context.cookie_checker.ensure_valid_cookies():
+            if not cli_context.active_account_context.cookie_checker.ensure_valid_cookies():
                 print("❌ Не удалось получить действительные cookies")
                 return None
 
             # Получаем Steam клиента через trade_manager
-            steam_client = cli_context.trade_manager._get_steam_client()
+            steam_client = cli_context.active_account_context.trade_manager._get_steam_client()
             if not steam_client:
                 print("❌ Не удалось получить Steam клиента")
                 return None
@@ -348,7 +348,7 @@ if ($result -eq "OK") {
         """Создание нового API ключа с подтверждением через Guard"""
         try:
             # Получаем Steam клиента
-            steam_client = cli_context.trade_manager._get_steam_client()
+            steam_client = cli_context.active_account_context.trade_manager._get_steam_client()
             if not steam_client:
                 print("❌ Не удалось получить Steam клиента")
                 return None

@@ -85,17 +85,18 @@ class Currency(IntEnum):
 
 
 class TradeOfferState(IntEnum):
+    """Состояния трейд офферов согласно официальной документации Steam"""
     Invalid = 1
-    Active = 2
-    Accepted = 3
-    Countered = 4
-    Expired = 5
-    Canceled = 6
-    Declined = 7
-    InvalidItems = 8
-    ConfirmationNeed = 9
-    CanceledBySecondaryFactor = 10
-    StateInEscrow = 11
+    Active = 2            # This trade offer has been sent, neither party has acted on it yet.
+    Accepted = 3          # The trade offer was accepted by the recipient and items were exchanged.
+    Countered = 4         # The recipient made a counter offer
+    Expired = 5           # The trade offer was not accepted before the expiration date
+    Canceled = 6          # The sender cancelled the offer
+    Declined = 7          # The recipient declined the offer
+    InvalidItems = 8      # Some of the items in the offer are no longer available (indicated by the missing flag in the output)
+    CreatedNeedsConfirmation = 9  # The offer hasn't been sent yet and is awaiting further confirmation
+    CanceledBySecondFactor = 10   # Either party canceled the offer via email/mobile confirmation
+    InEscrow = 11         # The trade has been placed on hold
 
 
 class SteamUrl:
@@ -297,17 +298,18 @@ class Language(str, Enum):  # need for params serialization
 
 
 class TradeOfferStatus(Enum):
+    """Состояния трейд офферов согласно официальной документации Steam"""
     INVALID = 1
-    ACTIVE = 2
-    ACCEPTED = 3
-    COUNTERED = 4
-    EXPIRED = 5
-    CANCELED = 6
-    DECLINED = 7
-    INVALID_ITEMS = 8
-    CONFIRMATION_NEED = 9
-    CANCELED_BY_SECONDARY_FACTOR = 10
-    STATE_IN_ESCROW = 11
+    ACTIVE = 2            # This trade offer has been sent, neither party has acted on it yet.
+    ACCEPTED = 3          # The trade offer was accepted by the recipient and items were exchanged.
+    COUNTERED = 4         # The recipient made a counter offer
+    EXPIRED = 5           # The trade offer was not accepted before the expiration date
+    CANCELED = 6          # The sender cancelled the offer
+    DECLINED = 7          # The recipient declined the offer
+    INVALID_ITEMS = 8     # Some of the items in the offer are no longer available (indicated by the missing flag in the output)
+    CREATED_NEEDS_CONFIRMATION = 9  # The offer hasn't been sent yet and is awaiting further confirmation
+    CANCELED_BY_SECOND_FACTOR = 10  # Either party canceled the offer via email/mobile confirmation
+    IN_ESCROW = 11        # The trade has been placed on hold
 
 
 # https://github.com/DoctorMcKay/node-steamcommunity/blob/master/resources/EConfirmationType.js
