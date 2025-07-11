@@ -195,6 +195,32 @@ class SteamBotCLI:
             print(self.formatter.format_error("Ошибка при получении трейдов: ", e))
             return None
     
+    def get_all_trades(self) -> Optional[List[TradeOffer]]:
+        """Получение списка всех трейдов (активные + требующие подтверждения)"""
+        if not self._is_account_selected():
+            return None
+            
+        try:
+            # Используем trade_manager из контекста для получения всех трейдов
+            trades = self.active_account_context.trade_manager.get_trade_offers(active_only=False)
+            
+            if trades:
+                # Объединяем все типы трейдов
+                all_trades = []
+                all_trades.extend(trades.active_received)
+                all_trades.extend(trades.active_sent)
+                all_trades.extend(trades.confirmation_needed_received)
+                all_trades.extend(trades.confirmation_needed_sent)
+                
+                return all_trades
+            else:
+                print("❌ Не удалось получить трейд офферы")
+                return None
+            
+        except Exception as e:
+            print(self.formatter.format_error("Ошибка при получении трейдов: ", e))
+            return None
+    
     def run(self):
         """Запуск CLI интерфейса"""
         if not self.config_manager.load_config():

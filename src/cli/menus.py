@@ -102,21 +102,24 @@ class MainMenu(BaseMenu):
     
     def open_trades_menu(self):
         """Открыть меню управления трейдами"""
-        # Сначала получаем актуальный список трейдов
+        # Получаем все трейды один раз
         print_and_log("🔄 Подготовка к управлению трейдами...")
-        trades = self.cli.get_active_trades()
+        all_trades = self.cli.get_all_trades()
         
-        if trades is None:
+        if all_trades is None:
             print_and_log("❌ Не удалось получить список трейдов", "ERROR")
             return
         
-        if not trades:
+        # Фильтруем активные трейды для проверки
+        active_trades = [t for t in all_trades if t.is_active]
+        
+        if not active_trades:
             print_and_log("ℹ️  Нет активных трейдов для управления", "INFO")
             input("Нажмите Enter для продолжения...")
             return
         
-        # Если есть трейды, открываем меню управления
-        trades_menu = TradesMenu(self.cli)
+        # Если есть трейды, открываем меню управления, передавая уже полученные данные
+        trades_menu = TradesMenu(self.cli, all_trades)
         trades_menu.run()
     
     def confirm_market_orders(self):
@@ -218,57 +221,114 @@ class SettingsMenu(NavigableMenu):
 class TradesMenu(NavigableMenu):
     """Меню управления трейдами"""
     
-    def __init__(self, cli_context):
+    def __init__(self, cli_context, all_trades=None):
         super().__init__(Messages.TRADES_TITLE)
         self.cli = cli_context
+        self.all_trades = all_trades  # Предварительно загруженные трейды
+        
         self.gift_handler = GiftAcceptHandler(
-            cli_context.trade_manager, 
+            cli_context.active_account_context.trade_manager, 
             cli_context.formatter,
-            cli_context.cookie_checker
+            cli_context.active_account_context.cookie_checker
         )
         self.confirm_handler = TradeConfirmHandler(
-            cli_context.trade_manager, 
+            cli_context.active_account_context.trade_manager, 
             cli_context.formatter,
-            cli_context.cookie_checker
+            cli_context.active_account_context.cookie_checker
         )
+        # Инициализируем с пустым списком, обновим в setup_menu
         self.specific_handler = SpecificTradeHandler(
-            cli_context.trade_manager, 
+            cli_context.active_account_context.trade_manager, 
             cli_context.formatter,
-            cli_context.active_trades_cache or [],
-            cli_context.cookie_checker
+            [],
+            cli_context.active_account_context.cookie_checker
         )
         self.checker = TradeCheckHandler(
-            cli_context.trade_manager, 
+            cli_context.active_account_context.trade_manager, 
             cli_context.formatter,
-            cli_context.cookie_checker
+            cli_context.active_account_context.cookie_checker
         )
     
     def setup_menu(self):
         """Настроить элементы меню трейдов"""
+        # Используем предварительно загруженные трейды или загружаем новые
+        if self.all_trades is None:
+            self.all_trades = self.cli.get_all_trades()
+        
+        # Проверяем наличие разных типов трейдов
+        has_gifts = False
+        has_confirmation_needed = False
+        has_any_trades = False
+        
+        if self.all_trades:
+            has_any_trades = True
+            
+            # Показываем информацию о найденных трейдах
+            active_received = [t for t in self.all_trades if not t.is_our_offer and t.is_active]
+            active_sent = [t for t in self.all_trades if t.is_our_offer and t.is_active]
+            confirmation_needed_received = [t for t in self.all_trades if not t.is_our_offer and t.needs_confirmation]
+            confirmation_needed_sent = [t for t in self.all_trades if t.is_our_offer and t.needs_confirmation]
+            
+            print_and_log("📋 Найденные трейды:")
+            if active_received:
+                print_and_log(f"  📥 Входящие активные: {len(active_received)}")
+            if active_sent:
+                print_and_log(f"  📤 Исходящие активные: {len(active_sent)}")
+            if confirmation_needed_received:
+                print_and_log(f"  🔑 Входящие требующие подтверждения: {len(confirmation_needed_received)}")
+            if confirmation_needed_sent:
+                print_and_log(f"  🔑 Исходящие требующие подтверждения: {len(confirmation_needed_sent)}")
+            
+            # Проверяем входящие активные трейды на подарки
+            for trade in active_received:
+                if trade.items_to_give_count == 0 and trade.items_to_receive_count > 0:
+                    has_gifts = True
+                    break
+        
+        # Проверяем трейды требующие подтверждения на основе уже полученных данных
+        if confirmation_needed_received or confirmation_needed_sent:
+            has_confirmation_needed = True
+        
+        # Если нет активных трейдов вообще, показываем сообщение
+        active_trades_count = len(active_received) + len(active_sent)
+        if active_trades_count == 0:
+            print_and_log("ℹ️ Нет активных трейдов для управления")
+            print_and_log("💡 Это может означать:")
+            print_and_log("  - Нет активных входящих трейдов")
+            print_and_log("  - Нет активных исходящих трейдов") 
+            print_and_log("  - Нет трейдов требующих подтверждения")
+        else:
+            print_and_log(f"✅ Найдено {active_trades_count} активных трейдов для управления")
+            
+        # Обновляем кэш трейдов в specific_handler
+        self.specific_handler.trades_cache = active_received + active_sent
+        
         self.add_item(MenuItem(
             TradeMenuChoice.ACCEPT_GIFTS.value,
             Messages.ACCEPT_GIFTS,
-            self.accept_gifts
+            self.accept_gifts,
+            enabled=has_gifts
         ))
         
         self.add_item(MenuItem(
             TradeMenuChoice.CONFIRM_ALL.value,
             Messages.CONFIRM_ALL,
             self.confirm_all_trades,
-            enabled=True  # Проверка доступности будет в самом методе
+            enabled=has_confirmation_needed
         ))
         
         self.add_item(MenuItem(
             TradeMenuChoice.ACCEPT_SPECIFIC.value,
             Messages.ACCEPT_SPECIFIC,
-            self.accept_specific_trade
+            self.accept_specific_trade,
+            enabled=active_trades_count > 0
         ))
         
         self.add_item(MenuItem(
             TradeMenuChoice.CONFIRM_SPECIFIC.value,
             Messages.CONFIRM_SPECIFIC,
             self.confirm_specific_trade,
-            enabled=True  # Проверка доступности будет в самом методе
+            enabled=has_confirmation_needed
         ))
         
         self.add_item(MenuItem(
@@ -283,7 +343,10 @@ class TradesMenu(NavigableMenu):
     
     def confirm_all_trades(self):
         """Подтвердить все трейды через Guard"""
-        if self.checker.has_guard_confirmation_needed_trades():
+        # Проверяем наличие трейдов требующих подтверждения на основе уже полученных данных
+        confirmation_needed = [t for t in self.all_trades if t.needs_confirmation] if self.all_trades else []
+        
+        if confirmation_needed:
             return self.confirm_handler.execute()
         else:
             print_and_log(Messages.NO_CONFIRMATION_TRADES)
@@ -292,7 +355,8 @@ class TradesMenu(NavigableMenu):
     
     def accept_specific_trade(self):
         """Принять конкретный трейд"""
-        if not self.cli.active_trades_cache:
+        # Используем уже полученные данные вместо нового запроса
+        if not self.specific_handler.trades_cache:
             print_and_log(Messages.NO_TRADES_FROM_MENU, "ERROR")
             return None
         
@@ -303,14 +367,20 @@ class TradesMenu(NavigableMenu):
     
     def confirm_specific_trade(self):
         """Подтвердить конкретный трейд через Guard"""
-        if not self.checker.has_guard_confirmation_needed_trades():
+        # Проверяем наличие трейдов требующих подтверждения на основе уже полученных данных
+        confirmation_needed = [t for t in self.all_trades if t.needs_confirmation] if self.all_trades else []
+        
+        if not confirmation_needed:
             print_and_log(Messages.NO_CONFIRMATION_TRADES)
             print_and_log(Messages.NO_CONFIRMATION_TRADES_HINT)
             return None
         
-        if not self.cli.active_trades_cache:
+        if not self.all_trades:
             print_and_log(Messages.NO_TRADES_FROM_MENU, "ERROR")
             return None
+        
+        # Обновляем кэш трейдов в обработчике с трейдами требующими подтверждения
+        self.specific_handler.trades_cache = confirmation_needed
         
         trade_num = self.specific_handler.get_trade_number()
         if trade_num:

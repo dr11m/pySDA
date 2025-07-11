@@ -242,7 +242,9 @@ class AutoManager:
         status_emoji = "✅" if self.settings.auto_confirm_trades else "❌"
         status_text = "включено" if self.settings.auto_confirm_trades else "выключено"
         print_and_log(f"{status_emoji} Авто подтверждение трейдов {status_text}")
-        print_and_log("ℹ️ Подтверждает ВСЕ принятые трейды (входящие и исходящие) через Guard")
+        print_and_log("ℹ️ Подтверждает ВСЕ трейды требующие подтверждения:")
+        print_and_log("  📥 Входящие трейды (принятые, но не подтвержденные)")
+        print_and_log("  📤 Исходящие трейды (отправленные, но не подтвержденные)")
         input("Нажмите Enter для продолжения...")
     
     def _toggle_auto_market(self):
@@ -282,13 +284,23 @@ class AutoManager:
 
             print_and_log(f"[{context.account_name}] ✅ Cookies валидны, выполняем задачи...")
 
+            # Получаем все трейды один раз для всех операций
+            print_and_log(f"[{context.account_name}] 🔍 Получение трейдов...")
+            trade_offers = context.trade_manager.get_trade_offers(active_only=False)
+            if not trade_offers:
+                print_and_log(f"[{context.account_name}] ℹ️ Нет трейдов для обработки")
+                return
+
+            # Кэшируем трейды для использования в методах
+            self._trade_cache.set(trade_offers.__dict__)
+            
             if settings.auto_accept_gifts:
                 print_and_log(f"[{context.account_name}] 🎁 Проверка подарков...")
-                self._process_free_trades(context)
+                self._process_free_trades_from_cache(context, trade_offers)
 
             if settings.auto_confirm_trades:
                 print_and_log(f"[{context.account_name}] 🔑 Проверка трейдов...")
-                self._process_trade_confirmations(context)
+                self._process_trade_confirmations_from_cache(context, trade_offers)
 
             if settings.auto_confirm_market:
                 print_and_log(f"[{context.account_name}] 🏪 Проверка маркета...")
@@ -296,9 +308,95 @@ class AutoManager:
         
         except Exception as e:
             print_and_log(f"[{context.account_name}] ❌ Ошибка во время выполнения задач автоматизации: {e}")
+        finally:
+            # Очищаем кэш после завершения
+            self._trade_cache.clear()
+
+    def _process_free_trades_from_cache(self, context: AccountContext, trade_offers):
+        """Обработка бесплатных трейдов (подарков) из кэшированных данных"""
+        try:
+            active_received = trade_offers.active_received
+            if not active_received:
+                print_and_log(f"[{context.account_name}] ℹ️ Нет входящих активных трейдов")
+                return
+
+            print_and_log(f"[{context.account_name}] 🎁 Найдено {len(active_received)} входящих трейдов")
+            
+            for trade in active_received:
+                # Проверяем, является ли трейд подарком (мы ничего не отдаем, но что-то получаем)
+                if trade.items_to_give_count == 0 and trade.items_to_receive_count > 0:
+                    print_and_log(f"[{context.account_name}] 🎁 Принимаем подарок (ID: {trade.tradeofferid})")
+                    
+                    # Принимаем трейд в веб-интерфейсе (оптимизированно)
+                    partner_account_id = str(trade.accountid_other)
+                    if context.trade_manager.accept_trade_offer(trade.tradeofferid, partner_account_id):
+                        print_and_log(f"[{context.account_name}] ✅ Подарок принят в веб-интерфейсе")
+                        # Для подарков НЕ требуется подтверждение через Guard
+                        print_and_log(f"[{context.account_name}] ℹ️ Подтверждение через Guard не требуется для подарков")
+                    else:
+                        print_and_log(f"[{context.account_name}] ❌ Ошибка принятия подарка")
+                else:
+                    print_and_log(f"[{context.account_name}] ℹ️ Трейд {trade.tradeofferid} не является подарком (отдаем: {trade.items_to_give_count}, получаем: {trade.items_to_receive_count})")
+
+        except Exception as e:
+            print_and_log(f"[{context.account_name}] ❌ Ошибка обработки подарков: {e}")
+
+    def _process_trade_confirmations_from_cache(self, context: AccountContext, trade_offers):
+        """Обработка подтверждений трейдов из кэшированных данных"""
+        try:
+            print_and_log(f"[{context.account_name}] 🔑 Проверка трейдов требующих подтверждения...")
+            
+            # Получаем трейды требующие подтверждения из кэшированных данных
+            confirmation_needed_received = trade_offers.confirmation_needed_received or []
+            confirmation_needed_sent = trade_offers.confirmation_needed_sent or []
+            
+            total_confirmations = len(confirmation_needed_received) + len(confirmation_needed_sent)
+            
+            if total_confirmations == 0:
+                print_and_log(f"[{context.account_name}] ℹ️ Нет трейдов требующих подтверждения")
+                return
+            
+            print_and_log(f"[{context.account_name}] 🔑 Найдено {total_confirmations} трейдов требующих подтверждения")
+            print_and_log(f"[{context.account_name}]   📥 Входящие: {len(confirmation_needed_received)}")
+            print_and_log(f"[{context.account_name}]   📤 Исходящие: {len(confirmation_needed_sent)}")
+            
+            confirmed_count = 0
+            error_count = 0
+            
+            # Обрабатываем все трейды требующие подтверждения
+            all_trades_to_confirm = confirmation_needed_received + confirmation_needed_sent
+            
+            for trade in all_trades_to_confirm:
+                try:
+                    trade_type = "входящий" if trade in confirmation_needed_received else "исходящий"
+                    
+                    # Дополнительная проверка состояния трейда
+                    print_and_log(f"[{context.account_name}] 🔑 Подтверждаем {trade_type} трейд {trade.tradeofferid}")
+                    print_and_log(f"[{context.account_name}]    Состояние: {trade.state_name}, Confirmation method: {trade.confirmation_method}, Trade ID: {trade.tradeid}")
+                    
+                    if context.trade_manager.confirm_accepted_trade_offer(trade.tradeofferid):
+                        print_and_log(f"[{context.account_name}] ✅ Трейд {trade.tradeofferid} подтвержден")
+                        confirmed_count += 1
+                    else:
+                        print_and_log(f"[{context.account_name}] ❌ Не удалось подтвердить трейд {trade.tradeofferid}")
+                        error_count += 1
+                        
+                except Exception as e:
+                    error_msg = str(e)
+                    if "ConfirmationExpected" in error_msg:
+                        print_and_log(f"[{context.account_name}] ⚠️ Трейд {trade.tradeofferid} уже не требует подтверждения (возможно, уже завершен)")
+                    else:
+                        print_and_log(f"[{context.account_name}] ❌ Ошибка подтверждения трейда {trade.tradeofferid}: {e}")
+                    error_count += 1
+            
+            # Итоговая статистика
+            print_and_log(f"[{context.account_name}] 📊 Итого: подтверждено {confirmed_count}, ошибок {error_count}")
+
+        except Exception as e:
+            print_and_log(f"[{context.account_name}] ❌ Ошибка обработки подтверждений трейдов: {e}")
 
     def _process_free_trades(self, context: AccountContext):
-        """Обработка бесплатных трейдов (подарков)"""
+        """Обработка бесплатных трейдов (подарков) - DEPRECATED, используйте _process_free_trades_from_cache"""
         try:
             trade_offers = context.trade_manager.get_trade_offers(active_only=True)
             if not trade_offers:
@@ -313,34 +411,43 @@ class AutoManager:
             print_and_log(f"[{context.account_name}] 🎁 Найдено {len(active_received)} входящих трейдов")
             
             for trade in active_received:
-                if trade.is_gift():
-                    print_and_log(f"[{context.account_name}] 🎁 Принимаем подарок от {trade.partner}")
+                # Проверяем, является ли трейд подарком (мы ничего не отдаем, но что-то получаем)
+                if trade.items_to_give_count == 0 and trade.items_to_receive_count > 0:
+                    print_and_log(f"[{context.account_name}] 🎁 Принимаем подарок (ID: {trade.tradeofferid})")
+                    
+                    # Принимаем трейд в веб-интерфейсе
                     if context.trade_manager.accept_trade_offer(trade.tradeofferid):
-                        print_and_log(f"[{context.account_name}] ✅ Подарок принят успешно")
+                        print_and_log(f"[{context.account_name}] ✅ Подарок принят в веб-интерфейсе")
+                        
+                        # Если включено авто-подтверждение, сразу подтверждаем через Guard
+                        if self.settings.auto_confirm_trades:
+                            print_and_log(f"[{context.account_name}] 🔑 Подтверждаем через Guard...")
+                            if context.trade_manager.confirm_accepted_trade_offer(trade.tradeofferid):
+                                print_and_log(f"[{context.account_name}] ✅ Подарок подтвержден через Guard")
+                            else:
+                                print_and_log(f"[{context.account_name}] ⚠️ Не удалось подтвердить через Guard")
                     else:
                         print_and_log(f"[{context.account_name}] ❌ Ошибка принятия подарка")
                 else:
-                    print_and_log(f"[{context.account_name}] ℹ️ Трейд {trade.tradeofferid} не является подарком")
+                    print_and_log(f"[{context.account_name}] ℹ️ Трейд {trade.tradeofferid} не является подарком (отдаем: {trade.items_to_give_count}, получаем: {trade.items_to_receive_count})")
 
         except Exception as e:
             print_and_log(f"[{context.account_name}] ❌ Ошибка обработки подарков: {e}")
 
     def _process_trade_confirmations(self, context: AccountContext):
-        """Обработка подтверждений трейдов"""
+        """Обработка подтверждений трейдов (входящие и исходящие) - DEPRECATED, используйте _process_trade_confirmations_from_cache"""
         try:
-            confirmations = context.trade_manager.get_confirmations()
-            if not confirmations:
-                print_and_log(f"[{context.account_name}] ℹ️ Нет подтверждений трейдов")
-                return
-
-            print_and_log(f"[{context.account_name}] 🔑 Найдено {len(confirmations)} подтверждений трейдов")
+            print_and_log(f"[{context.account_name}] 🔑 Проверка трейдов требующих подтверждения...")
             
-            for confirmation in confirmations:
-                print_and_log(f"[{context.account_name}] 🔑 Подтверждаем трейд {confirmation.get('id')}")
-                if context.trade_manager.confirm_trade_offer(confirmation.get('id')):
-                    print_and_log(f"[{context.account_name}] ✅ Трейд подтвержден")
-                else:
-                    print_and_log(f"[{context.account_name}] ❌ Ошибка подтверждения трейда")
+            # Используем новый метод который обрабатывает и входящие и исходящие трейды
+            stats = context.trade_manager.process_confirmation_needed_trades(auto_confirm=True)
+            
+            if stats['found_confirmation_needed'] > 0:
+                print_and_log(f"[{context.account_name}] ✅ Обработано {stats['confirmed_trades']} трейдов из {stats['found_confirmation_needed']}")
+                if stats['errors'] > 0:
+                    print_and_log(f"[{context.account_name}] ⚠️ Ошибок: {stats['errors']}")
+            else:
+                print_and_log(f"[{context.account_name}] ℹ️ Нет трейдов требующих подтверждения")
 
         except Exception as e:
             print_and_log(f"[{context.account_name}] ❌ Ошибка обработки подтверждений трейдов: {e}")

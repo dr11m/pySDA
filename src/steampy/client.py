@@ -139,8 +139,20 @@ class SteamClient:
         url = f'{SteamUrl.API_URL}/{interface}/{api_method}/{version}'
         response = self._session.get(url, params=params) if method == 'GET' else self._session.post(url, data=params)
 
-        if self.is_invalid_api_key(response):
-            raise InvalidCredentials('Invalid API key')
+        # Проверяем ошибки только если используем API ключ
+        if 'key' in (params or {}):
+            if self.is_invalid_api_key(response):
+                raise InvalidCredentials('Invalid API key')
+        else:
+            # Для access_token проверяем другие типы ошибок
+            if response.status_code != 200:
+                try:
+                    error_data = response.json()
+                    if 'error' in error_data:
+                        raise InvalidCredentials(f"API Error: {error_data['error']}")
+                except:
+                    pass
+                raise InvalidCredentials(f"HTTP {response.status_code}: {response.text}")
 
         return response
 
@@ -246,6 +258,74 @@ class SteamClient:
         return [json.loads(item) for item in texts_between(html, 'oItem = ', ';\r\n\toItem')]
 
     @login_required
+    def accept_trade_offer_optimized(self, trade_offer_id: str, partner_account_id: str = None) -> dict:
+        """
+        Оптимизированное принятие трейд оффера в веб-интерфейсе (без дополнительных GET запросов)
+        
+        Args:
+            trade_offer_id: ID трейд оффера
+            partner_account_id: Account ID партнера (если известен, иначе будет получен через GET)
+            
+        Returns:
+            Ответ от Steam API
+        """
+        # Если partner_account_id не передан, используем старый метод
+        if not partner_account_id:
+            return self.accept_trade_offer(trade_offer_id)
+        
+        # Конвертируем account_id в steam_id
+        partner_steam_id = account_id_to_steam_id(partner_account_id)
+        session_id = self._get_session_id()
+        accept_url = f'{SteamUrl.COMMUNITY_URL}/tradeoffer/{trade_offer_id}/accept'
+        
+        # Параметры запроса
+        params = {
+            'sessionid': session_id,
+            'serverid': '1',
+            'tradeofferid': trade_offer_id,
+            'partner': partner_steam_id,
+            'captcha': '',
+        }
+        
+
+        
+        # Заголовки на основе рабочего curl запроса
+        headers = {
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Connection': 'keep-alive',
+            'Origin': SteamUrl.COMMUNITY_URL,
+            'Referer': self._get_trade_offer_url(trade_offer_id),
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+            'X-KL-Ajax-Request': 'Ajax_Request',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+        }
+
+        try:
+            response = self._session.post(accept_url, data=params, headers=headers)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                # Возвращаем словарь с ошибкой
+                return {
+                    'strError': f'HTTP {response.status_code}: {response.text}',
+                    'success': False
+                }
+        except Exception as e:
+            # Возвращаем словарь с ошибкой
+            return {
+                'strError': f'Request failed: {str(e)}',
+                'success': False
+            }
+
+    @login_required
     def accept_trade_offer(self, trade_offer_id: str) -> dict:
         """
         Принятие трейд оффера в веб-интерфейсе (без автоматического подтверждения через Guard)
@@ -271,6 +351,7 @@ class SteamClient:
             'partner': partner,
             'captcha': '',
         }
+
         
         # Заголовки на основе рабочего curl запроса
         headers = {
