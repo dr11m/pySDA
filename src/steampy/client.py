@@ -101,7 +101,7 @@ class SteamClient:
 
     @login_required
     def save_session(self, path, username):
-        with open(f'{path}\\{username}.pkl', 'wb') as f:
+        with open(os.path.join(path, f'{username}.pkl'), 'wb') as f:
             pickle.dump(self._session, f)
 
     @login_required

@@ -203,7 +203,9 @@ if ($result -eq "OK") {
             print("💡 Попробуйте ввести путь к файлу вручную")
             
             # Fallback - ручной ввод
-            print(Messages.MAFILE_PATH_HINT)
+            current_os = platform.system().lower()
+            hint_message = Messages.MAFILE_PATH_HINT_LINUX if current_os in ["linux", "darwin"] else Messages.MAFILE_PATH_HINT
+            print(hint_message)
             file_path = input(Messages.ENTER_MAFILE_PATH).strip()
             return file_path if file_path else None
     

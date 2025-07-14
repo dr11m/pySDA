@@ -317,7 +317,7 @@ class AutoManager:
         try:
             active_received = trade_offers.active_received
             if not active_received:
-                print_and_log(f"[{context.account_name}] ℹ️ Нет входящих активных трейдов")
+                print_and_log(f"[{context.account_name}] ℹ️ Нет входящих активных 🎁 подарков")
                 return
 
             print_and_log(f"[{context.account_name}] 🎁 Найдено {len(active_received)} входящих трейдов")
