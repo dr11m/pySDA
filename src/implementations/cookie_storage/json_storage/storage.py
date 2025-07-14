@@ -20,8 +20,8 @@ class JsonCookieStorage(CookieStorageInterface):
     def __init__(self, **kwargs):
         # **kwargs используется для обратной совместимости, если фабрика передаст лишние параметры.
         # Всегда используем фиксированный путь для этой реализации
-        self.storage_dir = Path("src/implementations/json_cookie_storage/cookies")
-        self.storage_dir.mkdir(exist_ok=True)
+        self.storage_dir = Path("src/implementations/cookie_storage/json_storage/cookies")
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
     
     def save_cookies(self, username: str, cookies: Dict[str, str]) -> bool:
         """Сохранить cookies в JSON файл"""
