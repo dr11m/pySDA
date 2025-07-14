@@ -184,3 +184,6 @@ accounts_info/*
 config.yaml
 logs/*
 debug_apikey_page.html
+
+# Steam session files (содержат чувствительные данные)
+*.pkl
