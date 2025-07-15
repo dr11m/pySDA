@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from . import guard
 from .exceptions import ConfirmationExpected
 from .login import InvalidCredentials
+from src.utils.logger_setup import logger
 
 if TYPE_CHECKING:
     import requests
@@ -55,7 +56,10 @@ class ConfirmationExecutor:
         params['cid'] = confirmation.data_confid
         params['ck'] = confirmation.nonce
         headers = {'X-Requested-With': 'XMLHttpRequest'}
-        return self._session.get(f'{self.CONF_URL}/ajaxop', params=params, headers=headers).json()
+        response = self._session.get(f'{self.CONF_URL}/ajaxop', params=params, headers=headers).json()
+        logger.info(f"🔑 Отправлен запрос на подтверждение, response:\n {response}")
+        
+        return response
 
     def _get_confirmations(self) -> list[Confirmation]:
         confirmations = []
