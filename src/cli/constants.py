@@ -8,13 +8,8 @@ from enum import Enum
 
 class MenuChoice(Enum):
     """Выбор в главном меню"""
-    SELECT_ACCOUNT = "1"
-    UPDATE_COOKIES = "2"
-    MANAGE_TRADES = "3"
-    CONFIRM_MARKET = "4"
-    GET_GUARD_CODE = "5"
-    SETTINGS = "6"
-    AUTO_ACCEPT = "7"
+    ACCOUNT_ACTIONS = "1"
+    AUTOMATION = "2"
     EXIT = "0"
 
 
@@ -31,6 +26,8 @@ class SettingsMenuChoice(Enum):
     """Выбор в меню настроек"""
     ADD_MAFILE = "1"
     GET_API_KEY = "2"
+    GET_GUARD_CONFIRMATIONS = "3"
+    CHANGE_PASSWORD = "4"
     BACK = "0"
 
 
@@ -51,13 +48,8 @@ class Messages:
     AUTO_TITLE = "🤖 Автоматизация"
     
     # Главное меню
-    SELECT_ACCOUNT = "👤 Выбрать аккаунт"
-    UPDATE_COOKIES = "🍪 Обновить cookies"
-    MANAGE_TRADES = "📋 Управление трейдами (получить + управлять)"
-    CONFIRM_MARKET = "🏪 Подтвердить лоты на ТП"
-    GET_GUARD_CODE = "🔑 Получить Guard код"
-    SETTINGS = "⚙️  Настройки"
-    AUTO_ACCEPT = "🤖 Автоматизация"
+    ACCOUNT_ACTIONS = "👤 Действия с аккаунтом"
+    AUTOMATION = "🤖 Автоматизация"
     EXIT = "🚪 Выход"
     BACK = "⬅️ Назад"
     
@@ -71,6 +63,8 @@ class Messages:
     # Меню настроек
     ADD_MAFILE = "📁 Добавить maFile"
     GET_API_KEY = "🔑 Получить/обновить API ключ"
+    GET_GUARD_CONFIRMATIONS = "🔐 Получить список подтверждений Guard"
+    CHANGE_PASSWORD = "🔒 Смена пароля"
     
     # Меню автоматизации
     AUTO_SETTINGS = "⚙️  Настройки автоматизации"
@@ -123,6 +117,18 @@ class Messages:
     NO_MARKET_CONFIRMATIONS = "ℹ️  Нет market ордеров, требующих подтверждения"
     MARKET_CONFIRMATIONS_FOUND = "🏪 Найдено {count} market ордеров для подтверждения"
     MARKET_CONFIRMATION_ERROR = "❌ Ошибка подтверждения market ордера: {error}"
+    
+    # Новые сообщения для Guard подтверждений
+    GUARD_CONFIRMATIONS_FOUND = "🔐 Найдено {count} подтверждений Guard"
+    NO_GUARD_CONFIRMATIONS = "ℹ️ Нет ожидающих подтверждений Guard"
+    GUARD_CONFIRMATION_SUCCESS = "✅ Подтверждение {id} успешно обработано"
+    GUARD_CONFIRMATION_ERROR = "❌ Ошибка обработки подтверждения: {error}"
+    ENTER_CONFIRMATION_NUMBER = "📝 Введите номер подтверждения (1-{max_num}): "
+    
+    # Сообщения для смены пароля
+    PASSWORD_CHANGE_SUCCESS = "✅ Пароль успешно изменен"
+    PASSWORD_CHANGE_ERROR = "❌ Ошибка смены пароля: {error}"
+    PASSWORD_CHANGE_NOT_IMPLEMENTED = "⚠️ Функция смены пароля пока не реализована"
     
     # Промпты
     CHOOSE_ACTION = "🎯 Выберите действие: "

@@ -17,6 +17,7 @@ from src.models import TradeOffer
 from .settings_manager import SettingsManager
 from .auto_manager import AutoManager, AutoSettings
 from .market_handler import MarketHandler
+from .password_manager import PasswordManager
 from src.utils.logger_setup import print_and_log
 from pathlib import Path
 import json
@@ -154,6 +155,8 @@ class SettingsMenu(NavigableMenu):
         super().__init__(Messages.SETTINGS_TITLE)
         self.cli = cli_context
         self.settings_manager = SettingsManager()
+        self.password_manager = PasswordManager()
+        self.formatter = DisplayFormatter()
     
     def setup_menu(self):
         """Настроить элементы меню настроек"""
@@ -172,6 +175,18 @@ class SettingsMenu(NavigableMenu):
         ))
         
         self.add_item(MenuItem(
+            SettingsMenuChoice.GET_GUARD_CONFIRMATIONS.value,
+            Messages.GET_GUARD_CONFIRMATIONS,
+            self.get_guard_confirmations
+        ))
+        
+        self.add_item(MenuItem(
+            SettingsMenuChoice.CHANGE_PASSWORD.value,
+            Messages.CHANGE_PASSWORD,
+            self.change_password
+        ))
+        
+        self.add_item(MenuItem(
             SettingsMenuChoice.BACK.value,
             Messages.BACK,
             self.go_back
@@ -187,6 +202,99 @@ class SettingsMenu(NavigableMenu):
             print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
             return False
         return self.settings_manager.get_api_key(self.cli.active_account_context)
+    
+    def get_guard_confirmations(self):
+        """Получить список подтверждений Guard"""
+        if not self.cli.active_account_context:
+            print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
+            return False
+        
+        try:
+            print_and_log(self.formatter.format_section_header("🔐 Получение подтверждений Guard"))
+            
+            # Получаем подтверждения через trade_manager
+            confirmations = self.cli.active_account_context.trade_manager.get_guard_confirmations()
+            
+            if not confirmations:
+                print_and_log(Messages.NO_GUARD_CONFIRMATIONS)
+                input("Нажмите Enter для продолжения...")
+                return True
+            
+            print_and_log(Messages.GUARD_CONFIRMATIONS_FOUND.format(count=len(confirmations)))
+            print_and_log("")
+            
+            # Отображаем подробный список подтверждений
+            for i, confirmation in enumerate(confirmations, 1):
+                conf_type = confirmation.get('type', 'unknown')
+                conf_id = confirmation.get('id', 'N/A')
+                description = confirmation.get('description', f'Подтверждение #{conf_id}')
+                
+                # Эмодзи для разных типов подтверждений
+                type_emoji = {
+                    'market_listing': '🏪',
+                    'trade_offer': '📋',
+                    'api_key_request': '🔑',
+                    'market_purchase': '💰',
+                    'guard_setup': '🔐',
+                    'unknown': '❓'
+                }.get(conf_type, '❓')
+                
+                print_and_log(f"  {i}. {type_emoji} {conf_type.replace('_', ' ').title()}")
+                print_and_log(f"      📝 {description}")
+                print_and_log(f"      🆔 ID: {conf_id}")
+                
+                # Показываем дополнительные детали если есть
+                details = confirmation.get('details', {})
+                if details.get('item_name'):
+                    print_and_log(f"      🎮 Предмет: {details['item_name']}")
+                if details.get('price'):
+                    print_and_log(f"      💰 Цена: {details['price']}")
+                
+                print_and_log("")
+            
+            # Предлагаем подтвердить конкретное
+            while True:
+                choice = input(f"\n{Messages.ENTER_CONFIRMATION_NUMBER.format(max_num=len(confirmations))} (0 для отмены): ").strip()
+                
+                if choice == "0":
+                    break
+                
+                try:
+                    choice_num = int(choice)
+                    if 1 <= choice_num <= len(confirmations):
+                        selected_confirmation = confirmations[choice_num - 1]
+                        conf_id = selected_confirmation.get('id')
+                        conf_type = selected_confirmation.get('type', 'unknown')
+                        
+                        print_and_log(f"🔑 Подтверждаем {conf_type.replace('_', ' ')} (ID: {conf_id})...")
+                        
+                        # Подтверждаем выбранное
+                        result = self.cli.active_account_context.trade_manager.confirm_guard_confirmation(conf_id)
+                        
+                        if result:
+                            print_and_log(Messages.GUARD_CONFIRMATION_SUCCESS.format(id=conf_id))
+                        else:
+                            print_and_log(Messages.GUARD_CONFIRMATION_ERROR.format(error="Не удалось подтвердить"))
+                        
+                        break
+                    else:
+                        print_and_log("❌ Неверный номер подтверждения", "ERROR")
+                except ValueError:
+                    print_and_log("❌ Введите корректный номер", "ERROR")
+            
+            return True
+            
+        except Exception as e:
+            print_and_log(f"❌ Ошибка получения подтверждений Guard: {e}", "ERROR")
+            input("Нажмите Enter для продолжения...")
+            return False
+    
+    def change_password(self):
+        """Смена пароля"""
+        if not self.cli.active_account_context:
+            print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
+            return False
+        return self.password_manager.change_password(self.cli.active_account_context)
     
     def exit_app(self):
         """Выйти из приложения"""
