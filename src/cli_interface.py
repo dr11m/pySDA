@@ -154,9 +154,6 @@ class SteamBotCLI:
             
             if guard_code:
                 print(self.formatter.format_success(Messages.GUARD_CODE_GENERATED.format(code=guard_code)))
-                print()
-                print("💡 Скопируйте код и вставьте в Steam Mobile Authenticator")
-                print("⏰ Код действителен 30 секунд с момента генерации")
                 return True
             else:
                 print(self.formatter.format_error("Не удалось сгенерировать Guard код"))
