@@ -14,7 +14,7 @@ from .trade_handlers import (
     SpecificTradeHandler,
     TradeCheckHandler
 )
-from .menus import MainMenu, TradesMenu, AutoMenu
+from .menus import MainMenu, AccountActionsMenu, TradesMenu, AutoMenu
 from .auto_manager import AutoManager
 
 __all__ = [
@@ -35,6 +35,7 @@ __all__ = [
     'SpecificTradeHandler',
     'TradeCheckHandler',
     'MainMenu',
+    'AccountActionsMenu',
     'TradesMenu',
     'AutoMenu',
     'AutoManager'

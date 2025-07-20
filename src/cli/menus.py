@@ -43,44 +43,14 @@ class MainMenu(BaseMenu):
         self.items.clear() # Очищаем старые пункты
 
         self.add_item(MenuItem(
-            MenuChoice.SELECT_ACCOUNT.value,
-            Messages.SELECT_ACCOUNT,
-            self.cli.select_and_initialize_account
-        ))
-
-        self.add_item(MenuItem(
-            MenuChoice.UPDATE_COOKIES.value,
-            Messages.UPDATE_COOKIES,
-            self.cli.update_cookies
+            MenuChoice.ACCOUNT_ACTIONS.value,
+            Messages.ACCOUNT_ACTIONS,
+            self.open_account_actions_menu
         ))
         
         self.add_item(MenuItem(
-            MenuChoice.MANAGE_TRADES.value,
-            Messages.MANAGE_TRADES,
-            self.open_trades_menu
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.CONFIRM_MARKET.value,
-            Messages.CONFIRM_MARKET,
-            self.confirm_market_orders
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.GET_GUARD_CODE.value,
-            Messages.GET_GUARD_CODE,
-            self.cli.get_guard_code
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.SETTINGS.value,
-            Messages.SETTINGS,
-            self.open_settings_menu
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.AUTO_ACCEPT.value,
-            Messages.AUTO_ACCEPT,
+            MenuChoice.AUTOMATION.value,
+            Messages.AUTOMATION,
             self.open_auto_menu
         ))
         
@@ -92,6 +62,94 @@ class MainMenu(BaseMenu):
 
     def run(self):
         """Переопределенный цикл для динамического обновления меню."""
+        self.running = True
+        while self.running:
+            self._update_title()
+            self.setup_menu()
+            self.display_menu()
+            choice = self.get_user_choice()
+            if not self.handle_choice(choice):
+                break
+    
+    def open_account_actions_menu(self):
+        """Открыть меню действий с аккаунтом"""
+        account_menu = AccountActionsMenu(self.cli)
+        account_menu.run()
+    
+    def open_auto_menu(self):
+        """Открыть меню автоматизации"""
+        auto_menu = AutoMenu(self.cli)
+        auto_menu.run()
+    
+    def exit_app(self):
+        """Выйти из приложения"""
+        print(Messages.GOODBYE)
+        self.stop()
+
+
+class AccountActionsMenu(NavigableMenu):
+    """Меню действий с конкретным аккаунтом"""
+    
+    def __init__(self, cli_context):
+        super().__init__("👤 Действия с аккаунтом")
+        self.cli = cli_context
+        self.formatter = DisplayFormatter()
+    
+    def _update_title(self):
+        """Обновляет заголовок меню, чтобы показать выбранный аккаунт."""
+        if self.cli.selected_account_name:
+            self.title = f"👤 Действия с аккаунтом - [{self.cli.selected_account_name}]"
+        else:
+            self.title = f"👤 Действия с аккаунтом - [Аккаунт не выбран]"
+    
+    def setup_menu(self):
+        """Настроить элементы меню действий с аккаунтом"""
+        self.items.clear()
+        
+        self.add_item(MenuItem(
+            "1",
+            Messages.SELECT_ACCOUNT,
+            self.cli.select_and_initialize_account
+        ))
+        
+        self.add_item(MenuItem(
+            "2",
+            Messages.UPDATE_COOKIES,
+            self.cli.update_cookies
+        ))
+        
+        self.add_item(MenuItem(
+            "3",
+            Messages.MANAGE_TRADES,
+            self.open_trades_menu
+        ))
+        
+        self.add_item(MenuItem(
+            "4",
+            Messages.CONFIRM_MARKET,
+            self.confirm_market_orders
+        ))
+        
+        self.add_item(MenuItem(
+            "5",
+            Messages.GET_GUARD_CODE,
+            self.cli.get_guard_code
+        ))
+        
+        self.add_item(MenuItem(
+            "6",
+            Messages.SETTINGS,
+            self.open_settings_menu
+        ))
+        
+        self.add_item(MenuItem(
+            "0",
+            Messages.BACK,
+            self.go_back
+        ))
+    
+    def run(self):
+        """Переопределенный цикл для динамического обновления заголовка."""
         self.running = True
         while self.running:
             self._update_title()
@@ -136,16 +194,6 @@ class MainMenu(BaseMenu):
         """Открыть меню настроек"""
         settings_menu = SettingsMenu(self.cli)
         settings_menu.run()
-    
-    def open_auto_menu(self):
-        """Открыть меню автоматизации"""
-        auto_menu = AutoMenu(self.cli)
-        auto_menu.run()
-    
-    def exit_app(self):
-        """Выйти из приложения"""
-        print(Messages.GOODBYE)
-        self.stop()
 
 
 class SettingsMenu(NavigableMenu):
@@ -161,12 +209,6 @@ class SettingsMenu(NavigableMenu):
     def setup_menu(self):
         """Настроить элементы меню настроек"""
         self.items.clear()
-        
-        self.add_item(MenuItem(
-            SettingsMenuChoice.ADD_MAFILE.value,
-            Messages.ADD_MAFILE,
-            self.add_mafile
-        ))
         
         self.add_item(MenuItem(
             SettingsMenuChoice.GET_API_KEY.value,
@@ -198,10 +240,10 @@ class SettingsMenu(NavigableMenu):
     
     def get_api_key(self):
         """Получить API ключ"""
-        if not self.cli.active_account_context:
+        if not self.cli:
             print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
             return False
-        return self.settings_manager.get_api_key(self.cli.active_account_context)
+        return self.settings_manager.get_api_key(self.cli)
     
     def get_guard_confirmations(self):
         """Получить список подтверждений Guard"""
