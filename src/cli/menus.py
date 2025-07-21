@@ -17,6 +17,7 @@ from src.models import TradeOffer
 from .settings_manager import SettingsManager
 from .auto_manager import AutoManager, AutoSettings
 from .market_handler import MarketHandler
+from .password_manager import PasswordManager
 from src.utils.logger_setup import print_and_log
 from pathlib import Path
 import json
@@ -42,44 +43,14 @@ class MainMenu(BaseMenu):
         self.items.clear() # Очищаем старые пункты
 
         self.add_item(MenuItem(
-            MenuChoice.SELECT_ACCOUNT.value,
-            Messages.SELECT_ACCOUNT,
-            self.cli.select_and_initialize_account
-        ))
-
-        self.add_item(MenuItem(
-            MenuChoice.UPDATE_COOKIES.value,
-            Messages.UPDATE_COOKIES,
-            self.cli.update_cookies
+            MenuChoice.ACCOUNT_ACTIONS.value,
+            Messages.ACCOUNT_ACTIONS,
+            self.open_account_actions_menu
         ))
         
         self.add_item(MenuItem(
-            MenuChoice.MANAGE_TRADES.value,
-            Messages.MANAGE_TRADES,
-            self.open_trades_menu
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.CONFIRM_MARKET.value,
-            Messages.CONFIRM_MARKET,
-            self.confirm_market_orders
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.GET_GUARD_CODE.value,
-            Messages.GET_GUARD_CODE,
-            self.cli.get_guard_code
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.SETTINGS.value,
-            Messages.SETTINGS,
-            self.open_settings_menu
-        ))
-        
-        self.add_item(MenuItem(
-            MenuChoice.AUTO_ACCEPT.value,
-            Messages.AUTO_ACCEPT,
+            MenuChoice.AUTOMATION.value,
+            Messages.AUTOMATION,
             self.open_auto_menu
         ))
         
@@ -91,6 +62,94 @@ class MainMenu(BaseMenu):
 
     def run(self):
         """Переопределенный цикл для динамического обновления меню."""
+        self.running = True
+        while self.running:
+            self._update_title()
+            self.setup_menu()
+            self.display_menu()
+            choice = self.get_user_choice()
+            if not self.handle_choice(choice):
+                break
+    
+    def open_account_actions_menu(self):
+        """Открыть меню действий с аккаунтом"""
+        account_menu = AccountActionsMenu(self.cli)
+        account_menu.run()
+    
+    def open_auto_menu(self):
+        """Открыть меню автоматизации"""
+        auto_menu = AutoMenu(self.cli)
+        auto_menu.run()
+    
+    def exit_app(self):
+        """Выйти из приложения"""
+        print(Messages.GOODBYE)
+        self.stop()
+
+
+class AccountActionsMenu(NavigableMenu):
+    """Меню действий с конкретным аккаунтом"""
+    
+    def __init__(self, cli_context):
+        super().__init__("👤 Действия с аккаунтом")
+        self.cli = cli_context
+        self.formatter = DisplayFormatter()
+    
+    def _update_title(self):
+        """Обновляет заголовок меню, чтобы показать выбранный аккаунт."""
+        if self.cli.selected_account_name:
+            self.title = f"👤 Действия с аккаунтом - [{self.cli.selected_account_name}]"
+        else:
+            self.title = f"👤 Действия с аккаунтом - [Аккаунт не выбран]"
+    
+    def setup_menu(self):
+        """Настроить элементы меню действий с аккаунтом"""
+        self.items.clear()
+        
+        self.add_item(MenuItem(
+            "1",
+            Messages.SELECT_ACCOUNT,
+            self.cli.select_and_initialize_account
+        ))
+        
+        self.add_item(MenuItem(
+            "2",
+            Messages.UPDATE_COOKIES,
+            self.cli.update_cookies
+        ))
+        
+        self.add_item(MenuItem(
+            "3",
+            Messages.MANAGE_TRADES,
+            self.open_trades_menu
+        ))
+        
+        self.add_item(MenuItem(
+            "4",
+            Messages.CONFIRM_MARKET,
+            self.confirm_market_orders
+        ))
+        
+        self.add_item(MenuItem(
+            "5",
+            Messages.GET_GUARD_CODE,
+            self.cli.get_guard_code
+        ))
+        
+        self.add_item(MenuItem(
+            "6",
+            Messages.SETTINGS,
+            self.open_settings_menu
+        ))
+        
+        self.add_item(MenuItem(
+            "0",
+            Messages.BACK,
+            self.go_back
+        ))
+    
+    def run(self):
+        """Переопределенный цикл для динамического обновления заголовка."""
         self.running = True
         while self.running:
             self._update_title()
@@ -135,16 +194,6 @@ class MainMenu(BaseMenu):
         """Открыть меню настроек"""
         settings_menu = SettingsMenu(self.cli)
         settings_menu.run()
-    
-    def open_auto_menu(self):
-        """Открыть меню автоматизации"""
-        auto_menu = AutoMenu(self.cli)
-        auto_menu.run()
-    
-    def exit_app(self):
-        """Выйти из приложения"""
-        print(Messages.GOODBYE)
-        self.stop()
 
 
 class SettingsMenu(NavigableMenu):
@@ -154,21 +203,29 @@ class SettingsMenu(NavigableMenu):
         super().__init__(Messages.SETTINGS_TITLE)
         self.cli = cli_context
         self.settings_manager = SettingsManager()
+        self.password_manager = PasswordManager()
+        self.formatter = DisplayFormatter()
     
     def setup_menu(self):
         """Настроить элементы меню настроек"""
         self.items.clear()
         
         self.add_item(MenuItem(
-            SettingsMenuChoice.ADD_MAFILE.value,
-            Messages.ADD_MAFILE,
-            self.add_mafile
-        ))
-        
-        self.add_item(MenuItem(
             SettingsMenuChoice.GET_API_KEY.value,
             Messages.GET_API_KEY,
             self.get_api_key
+        ))
+        
+        self.add_item(MenuItem(
+            SettingsMenuChoice.GET_GUARD_CONFIRMATIONS.value,
+            Messages.GET_GUARD_CONFIRMATIONS,
+            self.get_guard_confirmations
+        ))
+        
+        self.add_item(MenuItem(
+            SettingsMenuChoice.CHANGE_PASSWORD.value,
+            Messages.CHANGE_PASSWORD,
+            self.change_password
         ))
         
         self.add_item(MenuItem(
@@ -183,10 +240,79 @@ class SettingsMenu(NavigableMenu):
     
     def get_api_key(self):
         """Получить API ключ"""
+        if not self.cli:
+            print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
+            return False
+        return self.settings_manager.get_api_key(self.cli)
+    
+    def get_guard_confirmations(self):
+        """Получить список подтверждений Guard"""
         if not self.cli.active_account_context:
             print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
             return False
-        return self.settings_manager.get_api_key(self.cli.active_account_context)
+        
+        try:
+            print_and_log(self.formatter.format_section_header("🔐 Получение подтверждений Guard"))
+            
+            # Получаем подтверждения через trade_manager
+            confirmations = self.cli.active_account_context.trade_manager.get_guard_confirmations()
+            
+            if not confirmations:
+                print_and_log(Messages.NO_GUARD_CONFIRMATIONS)
+                input("Нажмите Enter для продолжения...")
+                return True
+            
+            print_and_log(Messages.GUARD_CONFIRMATIONS_FOUND.format(count=len(confirmations)))
+            
+            # Отображаем подробный список подтверждений
+            for i, confirmation in enumerate(confirmations, 1):
+                conf_type = confirmation.get('type', 'unknown')
+                conf_id = confirmation.get('id', 'N/A')
+                            
+            # Предлагаем подтвердить конкретное
+            while True:
+                choice = input(f"\n{Messages.ENTER_CONFIRMATION_NUMBER.format(max_num=len(confirmations))} (0 для отмены): ").strip()
+                
+                if choice == "0":
+                    break
+                
+                try:
+                    choice_num = int(choice)
+                    if 1 <= choice_num <= len(confirmations):
+                        selected_confirmation = confirmations[choice_num - 1]
+                        conf_id = selected_confirmation.get('id')
+                        conf_type = selected_confirmation.get('type', 'unknown')
+                        confirmation_obj = selected_confirmation.get('confirmation')
+                        
+                        print_and_log(f"🔑 Подтверждаем {conf_type.replace('_', ' ')} (ID: {conf_id})...")
+                        
+                        # Подтверждаем выбранное
+                        result = self.cli.active_account_context.trade_manager.confirm_guard_confirmation(confirmation_obj)
+                        
+                        if result:
+                            print_and_log(Messages.GUARD_CONFIRMATION_SUCCESS.format(id=conf_id))
+                        else:
+                            print_and_log(Messages.GUARD_CONFIRMATION_ERROR.format(error="Не удалось подтвердить"))
+                        
+                        break
+                    else:
+                        print_and_log("❌ Неверный номер подтверждения", "ERROR")
+                except ValueError:
+                    print_and_log("❌ Введите корректный номер", "ERROR")
+            
+            return True
+            
+        except Exception as e:
+            print_and_log(f"❌ Ошибка получения подтверждений Guard: {e}", "ERROR")
+            input("Нажмите Enter для продолжения...")
+            return False
+    
+    def change_password(self):
+        """Смена пароля"""
+        if not self.cli.active_account_context:
+            print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
+            return False
+        return self.password_manager.change_password(self.cli.active_account_context)
     
     def exit_app(self):
         """Выйти из приложения"""

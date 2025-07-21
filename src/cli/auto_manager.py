@@ -300,10 +300,12 @@ class AutoManager:
 
             if settings.auto_confirm_trades:
                 print_and_log(f"[{context.account_name}] 🔑 Проверка трейдов...")
+                print_and_log(f"[{context.account_name}] ℹ️ Обрабатываются только trade подтверждения")
                 self._process_trade_confirmations_from_cache(context, trade_offers)
 
             if settings.auto_confirm_market:
                 print_and_log(f"[{context.account_name}] 🏪 Проверка маркета...")
+                print_and_log(f"[{context.account_name}] ℹ️ Обрабатываются только market подтверждения")
                 self._process_market_confirmations(context)
         
         except Exception as e:
@@ -464,6 +466,7 @@ class AutoManager:
             )
             
             print_and_log(f"[{context.account_name}] 🏪 Проверка подтверждений маркета...")
+            print_and_log(f"[{context.account_name}] ℹ️ Фильтруются только market подтверждения (листинги и покупки)")
             result = market_handler.confirm_all_market_orders()
             
             if result:
