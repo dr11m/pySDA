@@ -111,6 +111,12 @@ class ConfirmationExecutor:
         response = self._session.get(f'{self.CONF_URL}/getlist', params=params, headers=headers)
         if 'Steam Guard Mobile Authenticator is providing incorrect Steam Guard codes.' in response.text:
             raise InvalidCredentials('Invalid Steam Guard file')
+        # Сохраняем ответ в текстовый файл для отладки
+        try:
+            with open("debug_confirmations_page.txt", "w", encoding="utf-8") as f:
+                f.write(response.text)
+        except Exception as e:
+            pass  # Не мешаем основной логике, если не удалось сохранить
         return response
 
     def _fetch_confirmation_details_page(self, confirmation: Confirmation) -> str:
