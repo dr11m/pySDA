@@ -334,6 +334,138 @@ class TradeConfirmationManager:
             logger.debug(traceback.format_exc())
             return []
     
+    def get_guard_confirmations(self) -> List[Dict[str, Any]]:
+        """Получение ВСЕХ подтверждений Guard с детальной информацией"""
+        try:
+            steam_client = self._get_steam_client()
+            
+            logger.info("🔐 Получаем все подтверждения Guard...")
+            
+            # Проверяем наличие steam_guard для работы с подтверждениями
+            if not hasattr(steam_client, 'steam_guard') or not steam_client.steam_guard:
+                logger.warning("⚠️ Steam Guard не настроен, невозможно получить подтверждения")
+                return []
+            
+            # Создаем ConfirmationExecutor для работы с подтверждениями
+            from .steampy.confirmation import ConfirmationExecutor
+            from src.utils.confirmation_utils import determine_confirmation_type_from_json, extract_confirmation_info
+            
+            confirmation_executor = ConfirmationExecutor(
+                identity_secret=steam_client.steam_guard['identity_secret'],
+                my_steam_id=steam_client.steam_id,
+                session=steam_client._session
+            )
+            
+            # Получаем JSON с подтверждениями напрямую
+            confirmations_page = confirmation_executor._fetch_confirmations_page()
+            confirmations_json = confirmations_page.json()
+            
+            if not confirmations_json.get('success'):
+                logger.error("❌ Не удалось получить подтверждения")
+                return []
+            
+            all_confirmations = confirmations_json.get('conf', [])
+            
+            if not all_confirmations:
+                logger.info("ℹ️ Подтверждений Guard не найдено")
+                return []
+            
+            logger.info(f"✅ Найдено {len(all_confirmations)} подтверждений Guard")
+            
+            # Получаем детальную информацию для каждого подтверждения
+            detailed_confirmations = []
+            for i, conf_data in enumerate(all_confirmations, 1):
+                try:
+                    # Определяем тип подтверждения по JSON данным
+                    confirmation_type = determine_confirmation_type_from_json(conf_data)
+                    
+                    # Извлекаем дополнительную информацию через единую функцию
+                    confirmation_info = extract_confirmation_info(conf_data, confirmation_type)
+                    
+                    # Создаем объект Confirmation для совместимости
+                    conf = Confirmation(
+                        data_confid=conf_data['id'],
+                        nonce=conf_data['nonce'],
+                        creator_id=int(conf_data['creator_id'])
+                    )
+                    
+                    detailed_conf = {
+                        'id': conf_data['id'],
+                        'nonce': conf_data['nonce'],
+                        'creator_id': int(conf_data['creator_id']),
+                        'type': confirmation_type,
+                        'description': confirmation_info.get('description', f'Подтверждение #{conf_data["id"]}'),
+                        'confirmation_info': confirmation_info,  # Сохраняем дополнительную информацию
+                        'confirmation': conf  # Сохраняем оригинальный объект для подтверждения
+                    }
+                    
+                    detailed_confirmations.append(detailed_conf)
+                    
+                    logger.info(f"  {i}. {confirmation_type} - {detailed_conf['description']} (ID: {conf_data['id']})")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Ошибка обработки подтверждения {conf_data.get('id', 'unknown')}: {e}")
+                    # Добавляем базовую информацию даже при ошибке
+                    detailed_conf = {
+                        'id': conf_data.get('id', 'unknown'),
+                        'nonce': conf_data.get('nonce', ''),
+                        'creator_id': int(conf_data.get('creator_id', 0)),
+                        'type': 'unknown',
+                        'description': f'Подтверждение #{conf_data.get("id", "unknown")}',
+                        'confirmation_info': {},
+                        'confirmation': None
+                    }
+                    detailed_confirmations.append(detailed_conf)
+            
+            return detailed_confirmations
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения подтверждений Guard: {e}")
+            logger.debug(traceback.format_exc())
+            return []
+    
+    def _determine_confirmation_type(self, details_html: str) -> str:
+        """Определение типа подтверждения по HTML содержимому"""
+        from src.utils.confirmation_utils import determine_confirmation_type
+        return determine_confirmation_type(details_html)
+    
+    def _extract_confirmation_info(self, details_html: str, confirmation_type: str) -> Dict[str, Any]:
+        """Извлечение дополнительной информации из HTML подтверждения"""
+        from src.utils.confirmation_utils import extract_confirmation_info
+        return extract_confirmation_info(details_html, confirmation_type)
+    
+    def confirm_guard_confirmation(self, confirmation_obj) -> bool:
+        """Подтверждение конкретного подтверждения Guard"""
+        try:
+            steam_client = self._get_steam_client()
+            
+            logger.info(f"🔑 Подтверждаем подтверждение Guard: {confirmation_obj.data_confid}")
+            
+            # Создаем ConfirmationExecutor
+            from .steampy.confirmation import ConfirmationExecutor
+            
+            confirmation_executor = ConfirmationExecutor(
+                identity_secret=steam_client.steam_guard['identity_secret'],
+                my_steam_id=steam_client.steam_id,
+                session=steam_client._session
+            )
+            
+            # Подтверждаем через executor используя переданный объект
+            response = confirmation_executor._send_confirmation(confirmation_obj)
+            
+            if response and response.get('success'):
+                logger.info(f"✅ Подтверждение {confirmation_obj.data_confid} успешно обработано")
+                return True
+            else:
+                error_message = response.get('error', 'Unknown error') if response else 'No response'
+                logger.error(f"❌ Ошибка подтверждения {confirmation_obj.data_confid}: {error_message}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка подтверждения Guard: {e}")
+            logger.debug(traceback.format_exc())
+            return False
+    
     def accept_trade_offer(self, trade_offer_id: str, partner_account_id: str = None) -> bool:
         """Принятие трейд оффера через steampy клиент (только веб-принятие, без Guard)"""
         try:
