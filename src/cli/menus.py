@@ -263,37 +263,12 @@ class SettingsMenu(NavigableMenu):
                 return True
             
             print_and_log(Messages.GUARD_CONFIRMATIONS_FOUND.format(count=len(confirmations)))
-            print_and_log("")
             
             # Отображаем подробный список подтверждений
             for i, confirmation in enumerate(confirmations, 1):
                 conf_type = confirmation.get('type', 'unknown')
                 conf_id = confirmation.get('id', 'N/A')
-                description = confirmation.get('description', f'Подтверждение #{conf_id}')
-                
-                # Эмодзи для разных типов подтверждений
-                type_emoji = {
-                    'market_listing': '🏪',
-                    'trade_offer': '📋',
-                    'api_key_request': '🔑',
-                    'market_purchase': '💰',
-                    'guard_setup': '🔐',
-                    'unknown': '❓'
-                }.get(conf_type, '❓')
-                
-                print_and_log(f"  {i}. {type_emoji} {conf_type.replace('_', ' ').title()}")
-                print_and_log(f"      📝 {description}")
-                print_and_log(f"      🆔 ID: {conf_id}")
-                
-                # Показываем дополнительные детали если есть
-                details = confirmation.get('details', {})
-                if details.get('item_name'):
-                    print_and_log(f"      🎮 Предмет: {details['item_name']}")
-                if details.get('price'):
-                    print_and_log(f"      💰 Цена: {details['price']}")
-                
-                print_and_log("")
-            
+                            
             # Предлагаем подтвердить конкретное
             while True:
                 choice = input(f"\n{Messages.ENTER_CONFIRMATION_NUMBER.format(max_num=len(confirmations))} (0 для отмены): ").strip()
@@ -307,11 +282,12 @@ class SettingsMenu(NavigableMenu):
                         selected_confirmation = confirmations[choice_num - 1]
                         conf_id = selected_confirmation.get('id')
                         conf_type = selected_confirmation.get('type', 'unknown')
+                        confirmation_obj = selected_confirmation.get('confirmation')
                         
                         print_and_log(f"🔑 Подтверждаем {conf_type.replace('_', ' ')} (ID: {conf_id})...")
                         
                         # Подтверждаем выбранное
-                        result = self.cli.active_account_context.trade_manager.confirm_guard_confirmation(conf_id)
+                        result = self.cli.active_account_context.trade_manager.confirm_guard_confirmation(confirmation_obj)
                         
                         if result:
                             print_and_log(Messages.GUARD_CONFIRMATION_SUCCESS.format(id=conf_id))

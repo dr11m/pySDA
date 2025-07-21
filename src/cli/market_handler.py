@@ -80,26 +80,7 @@ class MarketHandler:
     def _get_market_confirmations(self, steam_client) -> List[dict]:
         """Получить все market подтверждения"""
         try:
-            # Проверяем, есть ли метод для получения подтверждений
-            if hasattr(steam_client, 'get_confirmations'):
-                confirmations = steam_client.get_confirmations()
-                
-                # Фильтруем только market подтверждения
-                market_confirmations = []
-                for conf in confirmations:
-                    if self._is_market_confirmation(conf):
-                        market_confirmations.append(conf)
-                
-                return market_confirmations
-            
-            # Альтернативный способ через прямой доступ к Guard
-            elif hasattr(steam_client, 'steam_guard'):
-                return self._get_confirmations_via_guard(steam_client)
-            
-            else:
-                logger.error("❌ Методы получения подтверждений недоступны")
-                return []
-                
+            return self._get_confirmations_via_guard(steam_client)      
         except Exception as e:
             logger.error(f"❌ Ошибка получения market подтверждений: {e}")
             return []
@@ -108,6 +89,7 @@ class MarketHandler:
         """Получение подтверждений через прямое обращение к Guard"""
         try:
             from src.steampy.confirmation import ConfirmationExecutor
+            from src.utils.confirmation_utils import determine_confirmation_type_from_json, extract_confirmation_info
             
             # Создаем executor для подтверждений
             confirmation_executor = ConfirmationExecutor(
@@ -116,137 +98,67 @@ class MarketHandler:
                 session=steam_client._session
             )
             
-            # Получаем все подтверждения
-            confirmations = confirmation_executor._get_confirmations()
+            # Получаем JSON с подтверждениями напрямую
+            confirmations_page = confirmation_executor._fetch_confirmations_page()
+            confirmations_json = confirmations_page.json()
             
-            # Фильтруем market подтверждения
+            if not confirmations_json.get('success'):
+                logger.error("❌ Не удалось получить подтверждения")
+                return []
+            
+            all_confirmations = confirmations_json.get('conf', [])
+            logger.info(f"🔍 Получено {len(all_confirmations)} подтверждений, фильтруем market...")
+            
+            # Фильтруем market подтверждения по JSON данным
             market_confirmations = []
-            for conf in confirmations:
-                # Получаем детали подтверждения для определения типа
+            for conf_data in all_confirmations:
                 try:
-                    details_html = confirmation_executor._fetch_confirmation_details_page(conf)
+                    # Получаем тип подтверждения
+                    confirmation_type = determine_confirmation_type_from_json(conf_data)
                     
-                    # Проверяем, является ли это market листингом
-                    if self._is_market_confirmation_by_details(details_html):
-                        # Извлекаем информацию о листинге
-                        listing_info = self._extract_listing_info(details_html)
+                    # Проверяем, является ли это market подтверждением
+                    if confirmation_type in ['market_listing', 'market_purchase']:
+                        # Получаем описание через единую функцию
+                        confirmation_info = extract_confirmation_info(conf_data, confirmation_type)
+                        description = confirmation_info.get('description', f'Market {confirmation_type}')
+                        
+                        # Показываем описание пользователю
+                        print_and_log(f"🏪 {description}")
+                        
+                        # Создаем объект Confirmation для совместимости
+                        from src.steampy.confirmation import Confirmation
+                        conf = Confirmation(
+                            data_confid=conf_data['id'],
+                            nonce=conf_data['nonce'],
+                            creator_id=int(conf_data['creator_id'])
+                        )
                         
                         market_confirmations.append({
-                            'id': conf.data_confid,
-                            'key': conf.nonce,
-                            'creator_id': conf.creator_id,
-                            'description': listing_info.get('description', f'Market Listing #{conf.creator_id}'),
-                            'item_name': listing_info.get('item_name', 'Unknown Item'),
-                            'price': listing_info.get('price', 'Unknown Price'),
+                            'id': conf_data['id'],
+                            'key': conf_data['nonce'],
+                            'creator_id': int(conf_data['creator_id']),
+                            'type': confirmation_type,
+                            'description': description,
                             'confirmation': conf
                         })
                         
                 except Exception as e:
-                    logger.warning(f"⚠️ Ошибка получения деталей подтверждения {conf.data_confid}: {e}")
+                    logger.warning(f"⚠️ Ошибка обработки подтверждения {conf_data.get('id', 'unknown')}: {e}")
                     continue
             
+            if market_confirmations:
+                print_and_log(f"✅ Найдено {len(market_confirmations)} market подтверждений для обработки")
+            else:
+                print_and_log("ℹ️ Нет market подтверждений")
             return market_confirmations
             
         except Exception as e:
             logger.error(f"❌ Ошибка получения подтверждений через Guard: {e}")
             return []
     
-    def _is_market_confirmation_by_details(self, details_html: str) -> bool:
-        """Определить, является ли подтверждение market листингом по HTML деталям"""
-        try:
-            soup = BeautifulSoup(details_html, 'html.parser')
-            
-            # Ищем признаки market листинга в HTML
-            # Market листинги содержат специфические элементы
-            market_indicators = [
-                'market_listing_price',
-                'market_listing_item_name',
-                'market_listing_action',
-                'confiteminfo',
-                'market_listing_table_header'
-            ]
-            
-            for indicator in market_indicators:
-                if indicator in details_html.lower():
-                    return True
-            
-            # Проверяем по классам CSS
-            market_classes = soup.find_all(class_=lambda x: x and 'market' in x.lower())
-            if market_classes:
-                return True
-            
-            # Проверяем по тексту
-            text_content = soup.get_text().lower()
-            market_keywords = ['sell on the community market', 'market listing', 'steam community market']
-            
-            for keyword in market_keywords:
-                if keyword in text_content:
-                    return True
-            
-            return False
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Ошибка анализа деталей подтверждения: {e}")
-            return False
+
     
-    def _extract_listing_info(self, details_html: str) -> dict:
-        """Извлечь информацию о листинге из HTML деталей"""
-        try:
-            soup = BeautifulSoup(details_html, 'html.parser')
-            info = {}
-            
-            # Извлекаем название предмета - ищем в разных местах
-            item_name = None
-            
-            # Поиск по различным селекторам
-            selectors = [
-                '.market_listing_item_name',
-                '.market_listing_item_name_link',
-                '.item_market_name',
-                '.economy_item_hoverable'
-            ]
-            
-            for selector in selectors:
-                elem = soup.select_one(selector)
-                if elem:
-                    item_name = elem.get_text().strip()
-                    break
-            
-            # Если не нашли по селекторам, ищем по тексту
-            if not item_name:
-                text = soup.get_text()
-                # Ищем паттерн между определенными словами
-                match = re.search(r'You want to sell.*?(\w+.*?)(?:You receive|for)', text, re.DOTALL)
-                if match:
-                    item_name = match.group(1).strip()
-            
-            if item_name:
-                info['item_name'] = item_name
-            
-            # Извлекаем цену - ищем "You receive"
-            price_match = re.search(r'You receive\s*([0-9,.\s]+[а-яё]+)', details_html, re.IGNORECASE)
-            if price_match:
-                info['price'] = price_match.group(1).strip()
-            
-            # Формируем компактное описание
-            item_name = info.get('item_name', 'Неизвестный предмет')
-            price = info.get('price', '')
-            
-            if price:
-                info['description'] = f"{item_name} → {price}"
-            else:
-                info['description'] = f"Market Listing: {item_name}"
-            
-            return info
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Ошибка извлечения информации о листинге: {e}")
-            return {'description': 'Market Listing', 'item_name': 'Неизвестный предмет'}
-    
-    def _is_market_confirmation(self, confirmation) -> bool:
-        """Проверить, является ли подтверждение market ордером (упрощенная версия)"""
-        # Эта функция используется как fallback, основная логика в _is_market_confirmation_by_details
-        return True
+
     
     def _display_confirmations(self, confirmations: List[dict]):
         """Отобразить список подтверждений"""
