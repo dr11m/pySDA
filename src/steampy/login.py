@@ -35,7 +35,7 @@ class LoginExecutor:
         else:
             raise ValueError('Method must be either GET or POST')
 
-    def login(self) -> Session:
+    def login(self) -> tuple[Session, str]:
         login_response = self._send_login_request()
         if not login_response.json()['response']:
             raise ApiException('No response received from Steam API. Please try again later.')
@@ -44,7 +44,7 @@ class LoginExecutor:
         finalized_response = self._finalize_login()
         self._perform_redirects(finalized_response.json())
         self.set_sessionid_cookies()
-        return self.session
+        return self.session, self.refresh_token
 
     def _send_login_request(self) -> Response:
         rsa_params = self._fetch_rsa_params()
