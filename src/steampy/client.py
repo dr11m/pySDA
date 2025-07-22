@@ -49,11 +49,12 @@ class SteamClient:
         self._api_key = api_key
         self.steam_id = steam_id
         self.session_path = session_path 
+        self.refresh_token = None
 
         # Инициализируем сессию сначала
         if session_path and os.path.exists(session_path):
             with open(session_path, 'rb') as f:
-                self._session = pickle.load(f)
+                self._session, self.refresh_token = pickle.load(f)
         else:
             self._session = requests.Session()
 
@@ -85,12 +86,48 @@ class SteamClient:
 
         return proxies
 
+    def _try_refresh_session(self) -> bool:
+        """Попытка обновить сессию через refresh токен"""
+        if not self.refresh_token:
+            print(f"❌ Refresh токен не найден для {self.username}")
+            return False
+            
+        try:
+            print(f"🔄 Пробуем обновить сессию через refresh токен для {self.username}...")
+            response = self._session.post(
+                'https://login.steampowered.com/jwt/refresh',
+                data={'refresh_token': self.refresh_token}
+            )
+            
+            if response.status_code == 200:
+                new_cookies = response.cookies
+                self._session.cookies.update(new_cookies)
+                print(f"✅ Сессия обновлена через refresh токен для {self.username}")
+                return True
+            else:
+                print(f"❌ Не удалось обновить сессию для {self.username}. Статус: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Ошибка обновления сессии для {self.username}: {e}")
+            
+        return False
+
     def login_if_need_to(self):        
         if not self.check_session_static(self.username, self._session):
-            LoginExecutor(self.username, self._password, self.steam_guard['shared_secret'], self._session).login()
+            # Сначала пробуем обновить через refresh token
+            if self._try_refresh_session():
+                self.was_login_executed = True
+                self.market._set_login_executed(self.steam_guard, self._get_session_id())
+                return
+                
+            # Если refresh token не сработал, делаем полный вход
+            print(f"🔐 Выполняем полный вход для {self.username}...")
+            session, refresh_token = LoginExecutor(self.username, self._password, self.steam_guard['shared_secret'], self._session).login()
+            self.refresh_token = refresh_token
+            print(f"💾 Получен новый refresh токен для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
         else:
+            print(f"✅ Сессия активна для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id(), )
 
@@ -102,7 +139,8 @@ class SteamClient:
     @login_required
     def save_session(self, path, username):
         with open(os.path.join(path, f'{username}.pkl'), 'wb') as f:
-            pickle.dump(self._session, f)
+            pickle.dump((self._session, self.refresh_token), f)
+        print(f"💾 Сессия и refresh токен сохранены для {username}")
 
     @login_required
     def logout(self) -> None:
