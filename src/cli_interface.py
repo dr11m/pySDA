@@ -80,16 +80,14 @@ class SteamBotCLI:
 
     def select_and_initialize_account(self) -> bool:
         """Отображает меню выбора аккаунта и инициализирует его."""
-        accounts_dir = Path(self.config_manager.get('accounts_dir', 'accounts_info'))
-        mafiles = list(accounts_dir.glob('*.maFile'))
+        # Загружаем аккаунты из конфигурационного файла
+        account_names = self.config_manager.get_all_account_names()
         
-        if not mafiles:
-            print(self.formatter.format_error("Не найдены maFile в директории 'accounts_info'. "
-                                              "Невозможно определить аккаунты."))
+        if not account_names:
+            print(self.formatter.format_error("Не найдены аккаунты в конфигурационном файле. "
+                                              "Добавьте аккаунты в секцию 'accounts' в config.yaml"))
             return False
             
-        account_names = [f.stem for f in mafiles]
-        
         print(self.formatter.format_section_header("Выберите аккаунт"))
         for i, name in enumerate(account_names, 1):
             print(f"  {i}. {name}")
