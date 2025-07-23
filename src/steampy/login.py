@@ -36,15 +36,20 @@ class LoginExecutor:
             raise ValueError('Method must be either GET or POST')
 
     def login(self) -> tuple[Session, str]:
-        login_response = self._send_login_request()
-        if not login_response.json()['response']:
-            raise ApiException('No response received from Steam API. Please try again later.')
-        self._check_for_captcha(login_response)
-        self._update_steam_guard(login_response)
-        finalized_response = self._finalize_login()
-        self._perform_redirects(finalized_response.json())
-        self.set_sessionid_cookies()
-        return self.session, self.refresh_token
+        try:
+            login_response = self._send_login_request()
+            if not login_response.json()['response']:
+                raise ApiException('No response received from Steam API. Please try again later.')
+            self._check_for_captcha(login_response)
+            self._update_steam_guard(login_response)
+            finalized_response = self._finalize_login()
+            self._perform_redirects(finalized_response.json())
+            self.set_sessionid_cookies()
+            return self.session, self.refresh_token
+        except Exception as e:
+            print(f"❌ Ошибка в login: {e}")
+            print(f"📋 Доступные cookies: {list(self.session.cookies.get_dict().keys())}")
+            raise
 
     def _send_login_request(self) -> Response:
         rsa_params = self._fetch_rsa_params()
@@ -54,24 +59,29 @@ class LoginExecutor:
         return self._api_call('POST', 'IAuthenticationService', 'BeginAuthSessionViaCredentials', params=request_data)
 
     def set_sessionid_cookies(self):
-        community_domain = SteamUrl.COMMUNITY_URL[8:]
-        store_domain = SteamUrl.STORE_URL[8:]
-        community_cookie_dic = self.session.cookies.get_dict(domain=community_domain)
-        store_cookie_dic = self.session.cookies.get_dict(domain=store_domain)
-        for name in ('steamLoginSecure', 'sessionid', 'steamRefresh_steam', 'steamCountry'):
-            cookie = self.session.cookies.get_dict()[name]
-            if name in ["steamLoginSecure"]:
-                store_cookie = create_cookie(name, store_cookie_dic[name], store_domain)
-            else:
-                store_cookie = create_cookie(name, cookie, store_domain)
+        try:
+            community_domain = SteamUrl.COMMUNITY_URL[8:]
+            store_domain = SteamUrl.STORE_URL[8:]
+            community_cookie_dic = self.session.cookies.get_dict(domain=community_domain)
+            store_cookie_dic = self.session.cookies.get_dict(domain=store_domain)
+            for name in ('steamLoginSecure', 'sessionid', 'steamRefresh_steam', 'steamCountry'):
+                cookie = self.session.cookies.get_dict()[name]
+                if name in ["steamLoginSecure"]:
+                    store_cookie = create_cookie(name, store_cookie_dic[name], store_domain)
+                else:
+                    store_cookie = create_cookie(name, cookie, store_domain)
 
-            if name in ["sessionid", "steamLoginSecure"]:
-                community_cookie = create_cookie(name, community_cookie_dic[name], community_domain)
-            else:
-                community_cookie = create_cookie(name, cookie, community_domain)
+                if name in ["sessionid", "steamLoginSecure"]:
+                    community_cookie = create_cookie(name, community_cookie_dic[name], community_domain)
+                else:
+                    community_cookie = create_cookie(name, cookie, community_domain)
 
-            self.session.cookies.set(**community_cookie)
-            self.session.cookies.set(**store_cookie)
+                self.session.cookies.set(**community_cookie)
+                self.session.cookies.set(**store_cookie)
+        except Exception as e:
+            print(f"❌ Ошибка в set_sessionid_cookies: {e}")
+            print(f"📋 Доступные cookies: {list(self.session.cookies.get_dict().keys())}")
+            raise
 
     def _fetch_rsa_params(self, current_number_of_repetitions: int = 0) -> dict:
         self.session.post(SteamUrl.COMMUNITY_URL)
@@ -120,37 +130,55 @@ class LoginExecutor:
             raise InvalidCredentials(login_response.json()['message'])
 
     def _perform_redirects(self, response_dict: dict) -> None:
-        parameters = response_dict.get('transfer_info')
-        if parameters is None:
-            raise Exception('Cannot perform redirects after login, no parameters fetched')
-        for pass_data in parameters:
-            pass_data['params']['steamID'] = response_dict['steamID']
-            self.session.post(pass_data['url'], pass_data['params'])
+        try:
+            parameters = response_dict.get('transfer_info')
+            if parameters is None:
+                raise Exception('Cannot perform redirects after login, no parameters fetched')
+            for pass_data in parameters:
+                pass_data['params']['steamID'] = response_dict['steamID']
+                self.session.post(pass_data['url'], pass_data['params'])
+        except Exception as e:
+            print(f"❌ Ошибка в _perform_redirects: {e}")
+            print(f"📋 Response dict keys: {list(response_dict.keys()) if response_dict else 'None'}")
+            raise
 
     def _update_steam_guard(self, login_response: Response) -> None:
-        client_id = login_response.json()['response']['client_id']
-        steamid = login_response.json()['response']['steamid']
-        request_id = login_response.json()['response']['request_id']
-        code_type = 3
-        code = guard.generate_one_time_code(self.shared_secret)
+        try:
+            client_id = login_response.json()['response']['client_id']
+            steamid = login_response.json()['response']['steamid']
+            request_id = login_response.json()['response']['request_id']
+            code_type = 3
+            code = guard.generate_one_time_code(self.shared_secret)
 
-        update_data = {'client_id': client_id, 'steamid': steamid, 'code_type': code_type, 'code': code}
-        response = self._api_call(
-            'POST', 'IAuthenticationService', 'UpdateAuthSessionWithSteamGuardCode', params=update_data,
-        )
-        if response.status_code == HTTPStatus.OK:
-            self._pool_sessions_steam(client_id, request_id)
-        else:
-            raise Exception('Cannot update Steam guard')
+            update_data = {'client_id': client_id, 'steamid': steamid, 'code_type': code_type, 'code': code}
+            response = self._api_call(
+                'POST', 'IAuthenticationService', 'UpdateAuthSessionWithSteamGuardCode', params=update_data,
+            )
+            if response.status_code == HTTPStatus.OK:
+                self._pool_sessions_steam(client_id, request_id)
+            else:
+                raise Exception('Cannot update Steam guard')
+        except Exception as e:
+            print(f"❌ Ошибка в _update_steam_guard: {e}")
+            raise
 
     def _pool_sessions_steam(self, client_id: str, request_id: str) -> None:
-        pool_data = {'client_id': client_id, 'request_id': request_id}
-        response = self._api_call('POST', 'IAuthenticationService', 'PollAuthSessionStatus', params=pool_data)
-        self.refresh_token = response.json()['response']['refresh_token']
+        try:
+            pool_data = {'client_id': client_id, 'request_id': request_id}
+            response = self._api_call('POST', 'IAuthenticationService', 'PollAuthSessionStatus', params=pool_data)
+            self.refresh_token = response.json()['response']['refresh_token']
+        except Exception as e:
+            print(f"❌ Ошибка в _pool_sessions_steam: {e}")
+            raise
 
     def _finalize_login(self) -> Response:
-        sessionid = self.session.cookies['sessionid']
-        redir = f'{SteamUrl.COMMUNITY_URL}/login/home/?goto='
-        finalized_data = {'nonce': self.refresh_token, 'sessionid': sessionid, 'redir': redir}
-        return self.session.post(SteamUrl.LOGIN_URL + '/jwt/finalizelogin', data=finalized_data)
+        try:
+            sessionid = self.session.cookies['sessionid']
+            redir = f'{SteamUrl.COMMUNITY_URL}/login/home/?goto='
+            finalized_data = {'nonce': self.refresh_token, 'sessionid': sessionid, 'redir': redir}
+            return self.session.post(SteamUrl.LOGIN_URL + '/jwt/finalizelogin', data=finalized_data)
+        except Exception as e:
+            print(f"❌ Ошибка в _finalize_login: {e}")
+            print(f"📋 Доступные cookies: {list(self.session.cookies.get_dict().keys())}")
+            raise
 
