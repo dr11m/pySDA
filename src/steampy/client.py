@@ -103,6 +103,28 @@ class SteamClient:
                 new_cookies = response.cookies
                 self._session.cookies.update(new_cookies)
                 print(f"✅ Сессия обновлена через refresh токен для {self.username}")
+                
+                # Получаем cookies для всех доменов после refresh
+                print(f"🔄 Получаем cookies для всех доменов...")
+                try:
+                    # Запросы к основным доменам Steam для получения cookies
+                    domains_to_check = [
+                        'https://steamcommunity.com',
+                        'https://store.steampowered.com',
+                        'https://help.steampowered.com'
+                    ]
+                    
+                    for domain in domains_to_check:
+                        try:
+                            domain_response = self._session.get(domain)
+                            print(f"✅ Получены cookies для {domain}")
+                        except Exception as e:
+                            print(f"⚠️ Ошибка получения cookies для {domain}: {e}")
+                    
+                    print(f"✅ Cookies для всех доменов получены")
+                except Exception as e:
+                    print(f"⚠️ Ошибка получения cookies для доменов: {e}")
+                
                 return True
             else:
                 print(f"❌ Не удалось обновить сессию для {self.username}. Статус: {response.status_code}")
