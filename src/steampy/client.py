@@ -34,6 +34,8 @@ from .utils import (
     parse_price
 )
 
+from src.utils.logger_setup import logger
+
 
 class SteamClient:
     def __init__(
@@ -89,41 +91,64 @@ class SteamClient:
     def _try_refresh_session(self) -> bool:
         """Попытка обновить сессию через refresh токен"""
         if not self.refresh_token:
-            print(f"❌ Refresh токен не найден для {self.username}")
+            logger.info(f"❌ Refresh токен не найден для {self.username}")
             return False
             
         try:
-            print(f"🔄 Пробуем обновить сессию через refresh токен для {self.username}...")
+            logger.info(f"🔄 Пробуем обновить сессию через refresh токен ({self.refresh_token[:10]}...) для {self.username}...")
+            
+            # Получаем старые cookies из текущей сессии (полная структура)
+            from src.utils.cookies_and_session import session_to_dict
+            old_session_dict = session_to_dict(self._session)
+            logger.info(f"📋 Старые cookies: {old_session_dict}")
+            
+            
             response = self._session.post(
                 'https://login.steampowered.com/jwt/refresh',
                 data={'refresh_token': self.refresh_token}
             )
             
             if response.status_code == 200:
-                new_cookies = response.cookies
-                self._session.cookies.update(new_cookies)
-                print(f"✅ Сессия обновлена через refresh токен для {self.username}")
+                logger.info(f"✅ Refresh token успешен для {self.username}")
                 
-                # Получаем cookies для всех доменов после refresh
-                print(f"🔄 Получаем cookies для всех доменов...")
-                try:
-                    # Запросы к основным доменам Steam для получения cookies
-                    domains_to_check = [
-                        'https://steamcommunity.com',
-                        'https://store.steampowered.com',
-                        'https://help.steampowered.com'
-                    ]
+                # Обновляем cookies по ключам во всех доменах
+                updated_cookies = []
+                for cookie in response.cookies:
+                    cookie_name = cookie.name
+                    cookie_value = cookie.value
+                    logger.info(f"🔄 Ищем и обновляем {cookie_name} во всех доменах...")
                     
-                    for domain in domains_to_check:
-                        try:
-                            domain_response = self._session.get(domain)
-                            print(f"✅ Получены cookies для {domain}")
-                        except Exception as e:
-                            print(f"⚠️ Ошибка получения cookies для {domain}: {e}")
+                    # Ищем cookie с таким именем во всех доменах и обновляем
+                    cookies_updated = 0
+                    for domain, paths in old_session_dict['cookies'].items():
+                        for path, cookies in paths.items():
+                            if cookie_name in cookies:
+                                # Обновляем значение
+                                cookies[cookie_name]['value'] = cookie_value
+                                cookies_updated += 1
+                                logger.info(f"  ✅ Обновлен {cookie_name} в домене {domain}")
                     
-                    print(f"✅ Cookies для всех доменов получены")
-                except Exception as e:
-                    print(f"⚠️ Ошибка получения cookies для доменов: {e}")
+                    if cookies_updated > 0:
+                        updated_cookies.append(f"{cookie_name} (обновлен в {cookies_updated} доменах)")
+                    else:
+                        logger.info(f"  ⚠️ {cookie_name} не найден в старых cookies")
+                        updated_cookies.append(f"{cookie_name} (новый)")
+                
+                # Обновляем cookies в сессии по ключам во всех доменах
+                for cookie in response.cookies:
+                    cookie_name = cookie.name
+                    cookie_value = cookie.value
+                    
+                    # Находим все cookies с таким именем в сессии и обновляем их
+                    for session_cookie in self._session.cookies:
+                        if session_cookie.name == cookie_name:
+                            session_cookie.value = cookie_value
+                            logger.info(f"  🔄 Обновлен {cookie_name} в сессии для домена {session_cookie.domain}")
+                
+                new_session_dict = session_to_dict(self._session)
+                logger.info(f"📋 новые cookies: {new_session_dict}")
+
+                logger.info(f"✅ Сессия обновлена через refresh токен для {self.username}")
                 
                 return True
             else:
@@ -162,7 +187,7 @@ class SteamClient:
     def save_session(self, path, username):
         with open(os.path.join(path, f'{username}.pkl'), 'wb') as f:
             pickle.dump((self._session, self.refresh_token), f)
-        print(f"💾 Сессия и refresh токен сохранены для {username}")
+        print(f"💾 Сессия и refresh токен сохранены в pkl для {username}")
 
     @login_required
     def logout(self) -> None:
@@ -346,8 +371,6 @@ class SteamClient:
             'partner': partner_steam_id,
             'captcha': '',
         }
-        
-
         
         # Заголовки на основе рабочего curl запроса
         headers = {

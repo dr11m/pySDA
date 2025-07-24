@@ -293,8 +293,11 @@ class CookieManager:
     
     def get_steam_client(self) -> Optional[SteamClient]:
         """Получение настроенного Steam клиента с сессией из pkl"""
+        logger.info("🔍 get_steam_client() вызван")
+        
         # Если клиент уже есть и сессия активна - возвращаем его
         if self.steam_client and hasattr(self.steam_client, 'was_login_executed') and self.steam_client.was_login_executed:
+            logger.info("✅ Возвращаем существующий активный клиент")
             return self.steam_client
         
         # Проверяем актуальность cookies
@@ -335,6 +338,11 @@ class CookieManager:
                 except Exception as login_error:
                     logger.error(f"❌ Критическая ошибка входа: {login_error}")
                     return None
+        
+        # Показываем cookies в возвращаемом клиенте
+        if self.steam_client and hasattr(self.steam_client, '_session'):
+            client_cookies = [f"{cookie.name}@{cookie.domain}" for cookie in self.steam_client._session.cookies]
+            logger.info(f"📋 Cookies в возвращаемом клиенте: {client_cookies}")
         
         return self.steam_client
     

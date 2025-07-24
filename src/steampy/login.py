@@ -44,7 +44,7 @@ class LoginExecutor:
             self._update_steam_guard(login_response)
             finalized_response = self._finalize_login()
             self._perform_redirects(finalized_response.json())
-            # self.set_sessionid_cookies()  # Временно отключено для тестирования
+            self.set_sessionid_cookies()  # Временно отключено для тестирования
             return self.session, self.refresh_token
         except Exception as e:
             print(f"❌ Ошибка в login: {e}")
