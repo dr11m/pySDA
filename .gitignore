@@ -188,3 +188,7 @@ debug_apikey_page.html
 # Steam session files (содержат чувствительные данные)
 *.pkl
 debug_confirmations_page.txt
+
+# Debug files
+debug_*.json
+debug_*.txt

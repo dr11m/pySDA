@@ -42,10 +42,7 @@ class TradeConfirmationManager:
     
     def _get_steam_client(self) -> SteamClient:
         """Получает или создает экземпляр SteamClient."""
-        if self._steam_client and hasattr(self._steam_client, 'was_login_executed') and self._steam_client.was_login_executed:
-            return self._steam_client
-
-        # Получаем готовый клиент из CookieManager
+        # Всегда получаем свежий клиент из CookieManager
         self._steam_client = self.cookie_manager.get_steam_client()
         if not self._steam_client:
             raise Exception("Не удалось получить настроенный Steam клиент из CookieManager.")
@@ -259,13 +256,33 @@ class TradeConfirmationManager:
             jar = steam_client._session.cookies
             steam_login_secure_cookie = None
             
+            # Показываем все доступные cookies для отладки
+            available_cookies = [f"{cookie.name}@{cookie.domain}" for cookie in jar]
+            logger.info(f"📋 Все доступные cookies в trade_confirmation_manager: {available_cookies}")
+            
+            # Показываем детальную информацию о каждом cookie
+            logger.info("🔍 Детальная информация о cookies:")
+            for cookie in jar:
+                logger.info(f"  {cookie.name}@{cookie.domain} = {cookie.value[:50]}... (secure: {cookie.secure}, expires: {cookie.expires})")
+            
+            # Ищем steamLoginSecure в любом домене для отладки
+            steam_login_secure_found = False
+            for cookie in jar:
+                if cookie.name == 'steamLoginSecure':
+                    steam_login_secure_found = True
+                    logger.info(f"🔍 Найден steamLoginSecure в домене: {cookie.domain} (но ищем только в steamcommunity.com)")
+            
+            # Ищем steamLoginSecure только в steamcommunity.com
             for cookie in jar:
                 if cookie.name == 'steamLoginSecure' and cookie.domain == 'steamcommunity.com':
                     steam_login_secure_cookie = cookie.value
+                    logger.info(f"✅ Найден steamLoginSecure в домене: {cookie.domain}")
                     break
             
             if not steam_login_secure_cookie:
-                logger.warning("❌ Cookie 'steamLoginSecure' не найден")
+                logger.warning("❌ Cookie 'steamLoginSecure' не найден в домене steamcommunity.com")
+                if steam_login_secure_found:
+                    logger.warning("⚠️ Но steamLoginSecure найден в других доменах!")
                 return None
             
             decoded_cookie_value = unquote(steam_login_secure_cookie)
