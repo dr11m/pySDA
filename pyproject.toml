@@ -1,6 +1,6 @@
 [project]
 name = "pySDA"
-version = "2.1.1"
+version = "2.2.0"
 description = "Автоматический торговый бот для Steam с поддержкой SDA"
 authors = [
     { name = "dr11m", email = "drr111m@gmail.com" }
