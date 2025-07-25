@@ -29,6 +29,6 @@ class DelayedHTTPAdapter(HTTPAdapter):
         finally:
             # Независимо от результата запроса (успех или ошибка),
             # выполняем задержку.
-            if self.delay > 0:
+            if hasattr(self, 'delay') and self.delay > 0:
                 logger.debug(f"Пауза на {self.delay:.2f} сек после запроса к {request.url}")
                 time.sleep(self.delay) 
