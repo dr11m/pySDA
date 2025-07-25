@@ -85,8 +85,8 @@ class SteamClient:
 
         self.market = SteamMarket(self._session, self.steam_id)
     
-    @staticmethod
-    def extract_steam_id(refresh_token: str) -> str:
+
+    def extract_steam_id(self, refresh_token: str) -> str:
         """Извлекает SteamID из JWT токена"""
         parts = refresh_token.split('.')
         payload = json.loads(base64.b64decode(parts[1] + '=='))
@@ -94,17 +94,12 @@ class SteamClient:
 
     def get_steam_login_cookies(self, refresh_token: str) -> dict:
         """
-        Получает только steamLoginSecure и sessionid - минимум для работы со Steam
+        Получает steamLoginSecure и sessionid для разных доменов Steam
         """
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
-        
         session_id = secrets.token_hex(12)
         
         # Шаг 1: finalizelogin для получения transfer_info
-        resp = session.post(
+        resp = self._session.post(
             f'{self.STEAM_LOGIN_BASE}/jwt/finalizelogin',
             data={
                 'nonce': refresh_token,
@@ -121,40 +116,152 @@ class SteamClient:
         if 'error' in result or 'transfer_info' not in result:
             raise Exception(f"Login failed: {result}")
         
-        # Шаг 2: Один transfer запрос для получения steamLoginSecure
+        # Шаг 2: Выполняем ВСЕ transfer запросы для получения токенов всех доменов
         steam_id = self.extract_steam_id(refresh_token)
-        transfer = result['transfer_info'][0]  # Берем первый
+        domain_tokens = {}  # Храним токены по доменам
         
-        tr_resp = session.post(
-            transfer['url'],
-            data={'steamID': steam_id, **transfer['params']}
-        )
+        for transfer in result['transfer_info']:
+            url = transfer['url']
+            domain = url.split('/')[2]  # Извлекаем домен из URL
+            
+            tr_resp = self._session.post(
+                url,
+                data={'steamID': steam_id, **transfer['params']}
+            )
+            
+            # Извлекаем steamLoginSecure для этого домена
+            try:
+                cookies = tr_resp.raw._original_response.msg.get_all('Set-Cookie') or []
+                for cookie in cookies:
+                    if 'steamLoginSecure=' in cookie:
+                        token_value = cookie.split('steamLoginSecure=')[1].split(';')[0]
+                        domain_tokens[domain] = token_value
+                        logger.info(f"✅ Получен токен для домена {domain}: {token_value[:20]}...")
+                        break
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось извлечь токен для {domain}: {e}")
+                continue
         
-        # Шаг 3: Извлекаем steamLoginSecure из Set-Cookie
-        steam_login_secure = None
-        try:
-            cookies = tr_resp.raw._original_response.msg.get_all('Set-Cookie') or []
-            for cookie in cookies:
-                if 'steamLoginSecure=' in cookie:
-                    steam_login_secure = cookie.split('steamLoginSecure=')[1].split(';')[0]
-                    break
-        except:
-            raise Exception("Не удалось получить steamLoginSecure")
+        if not domain_tokens:
+            raise Exception("Не удалось получить ни одного steamLoginSecure токена")
         
-        if not steam_login_secure:
-            raise Exception("steamLoginSecure не найден в ответе")
-        
+        # Возвращаем токены для всех доменов
         return {
-            'steamLoginSecure': steam_login_secure,
+            'domain_tokens': domain_tokens,
             'sessionid': session_id
         }
 
-    def format_cookies_for_domain(self, cookies_dict: dict, domain: str) -> list[str]:
-        """Форматирует куки для конкретного домена"""
-        return [
-            f"steamLoginSecure={cookies_dict['steamLoginSecure']}; Path=/; Secure; HttpOnly; Domain={domain}",
-            f"sessionid={cookies_dict['sessionid']}; Path=/; Secure; Domain={domain}"
-        ]
+    def _try_refresh_session(self) -> bool:
+        """Попытка обновить сессию через refresh токен"""
+        if not self.refresh_token:
+            logger.info(f"❌ Refresh токен не найден для {self.username}")
+            return False
+            
+        try:
+            logger.info(f"🔄 Пробуем обновить сессию через refresh токен ({self.refresh_token[:10]}...) для {self.username}...")
+            
+            # Логируем старые cookies
+            logger.info(f"📋 Старые cookies: {self._session.__dict__}")
+            
+            # Получаем токены для всех доменов
+            cookies_data = self.get_steam_login_cookies(self.refresh_token)
+            domain_tokens = cookies_data['domain_tokens']
+            new_session_id = cookies_data['sessionid']
+            
+            logger.info(f"🔄 Получены новые cookies: steamLoginSecure={list(domain_tokens.values())[0][:20]}..., sessionid={new_session_id}")
+            logger.info(f"🔄 Получены токены для доменов: {list(domain_tokens.keys())}")
+            
+            # Обновляем cookies в сессии с правильными токенами для каждого домена
+            cookies_updated = 0
+            
+            # Обновляем существующие cookies правильными токенами
+            for session_cookie in self._session.cookies:
+                if session_cookie.name == 'steamLoginSecure':
+                    # Находим правильный токен для этого домена
+                    domain = session_cookie.domain
+                    if domain in domain_tokens:
+                        session_cookie.value = domain_tokens[domain]
+                        logger.info(f"  ✅ Обновлен steamLoginSecure в домене {domain}")
+                        cookies_updated += 1
+                    else:
+                        # Если для этого домена нет специального токена, используем первый доступный
+                        first_token = next(iter(domain_tokens.values()))
+                        session_cookie.value = first_token
+                        logger.info(f"  🔄 Обновлен steamLoginSecure для домена {domain} (использован общий токен)")
+                        cookies_updated += 1
+                        
+                elif session_cookie.name == 'sessionid':
+                    session_cookie.value = new_session_id
+                    logger.info(f"  ✅ Обновлен sessionid в домене {session_cookie.domain}")
+                    cookies_updated += 1
+            
+            # Обновляем sessionid в самой сессии для каждого домена
+            for domain in ['help.steampowered.com', 'login.steampowered.com', 'steamcommunity.com', 'store.steampowered.com']:
+                self._session.cookies.set('sessionid', new_session_id, domain=domain)
+                logger.info(f"  🔄 Обновлен sessionid в сессии для домена {domain}")
+                
+                # Обновляем steamLoginSecure в сессии для каждого домена
+                if domain in domain_tokens:
+                    self._session.cookies.set('steamLoginSecure', domain_tokens[domain], domain=domain)
+                    logger.info(f"  🔄 Обновлен steamLoginSecure в сессии для домена {domain}")
+                elif domain_tokens:  # Если есть хотя бы один токен
+                    first_token = next(iter(domain_tokens.values()))
+                    self._session.cookies.set('steamLoginSecure', first_token, domain=domain)
+                    logger.info(f"  🔄 Обновлен steamLoginSecure в сессии для домена {domain} (общий токен)")
+            
+            # Добавляем недостающие cookies для доменов
+            from http.cookiejar import Cookie
+            required_domains = ['steamcommunity.com', 'store.steampowered.com', 'help.steampowered.com', 'login.steampowered.com']
+            
+            for domain in required_domains:
+                # Проверяем наличие steamLoginSecure для домена
+                domain_cookies = [c for c in self._session.cookies if c.domain == domain]
+                has_steam_login = any(c.name == 'steamLoginSecure' for c in domain_cookies)
+                
+                if not has_steam_login:
+                    # Выбираем подходящий токен для домена
+                    token_to_use = None
+                    if domain in domain_tokens:
+                        token_to_use = domain_tokens[domain]
+                    else:
+                        # Используем первый доступный токен
+                        token_to_use = next(iter(domain_tokens.values()))
+                    
+                    if token_to_use:
+                        steam_login_cookie = Cookie(
+                            version=0, name='steamLoginSecure', value=token_to_use,
+                            port=None, port_specified=False, domain=domain,
+                            domain_specified=True, domain_initial_dot=False,
+                            path='/', path_specified=True, secure=True,
+                            expires=None, discard=True, comment=None, comment_url=None,
+                            rest={'HttpOnly': None, 'SameSite': 'None'}
+                        )
+                        self._session.cookies.set_cookie(steam_login_cookie)
+                        logger.info(f"  ➕ Добавлен steamLoginSecure для домена {domain}")
+                        cookies_updated += 1
+            
+            self.was_login_executed = True
+            
+            # Сохраняем сессию
+            if self.session_path:
+                self.save_session(os.path.dirname(self.session_path), self.username)
+                logger.info(f"💾 Сессия сохранена в pkl для {self.username}")
+            
+            # Логируем новые cookies
+            logger.info(f"📋 Новые cookies: {self._session.__dict__}")
+            
+            logger.info(f"✅ Сессия обновлена через refresh токен для {self.username} (обновлено {cookies_updated} cookies)")
+            
+            # Проверяем сессию
+            if not self.check_session_static(self.username, self._session):
+                logger.info(f"❌ Сессия была обновлена через refresh token, но не прошла проверку {self.username})")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка обновления сессии для {self.username}: {e}")
+            return False
 
     def set_proxies(self, proxies: dict) -> dict:
         if not isinstance(proxies, dict):
@@ -168,94 +275,6 @@ class SteamClient:
 
         return proxies
 
-    def _try_refresh_session(self) -> bool:
-        """Попытка обновить сессию через refresh токен"""
-        if not self.refresh_token:
-            logger.info(f"❌ Refresh токен не найден для {self.username}")
-            return False
-            
-        try:
-            logger.info(f"🔄 Пробуем обновить сессию через refresh токен ({self.refresh_token[:10]}...) для {self.username}...")
-            
-            # 1. Получаем все старые куки
-            from src.utils.cookies_and_session import session_to_dict
-            old_session_dict = session_to_dict(self._session)
-            logger.info(f"📋 Старые cookies: {old_session_dict}")
-            
-            # Сохраняем старые cookies в JSON для отладки
-            import json
-            from pathlib import Path
-            
-            # Создаем директорию для отладочных файлов если её нет
-            debug_dir = Path("debug_info")
-            debug_dir.mkdir(exist_ok=True)
-            
-            # Сохраняем старые cookies
-            old_cookies_file = debug_dir / f"{self.username}_old_cookies.json"
-            with open(old_cookies_file, 'w', encoding='utf-8') as f:
-                json.dump(old_session_dict, f, indent=2, ensure_ascii=False)
-            
-            # 2. Через новый метод get_steam_login_cookies() получаем steamLoginSecure и sessionid
-            new_cookies = self.get_steam_login_cookies(self.refresh_token)
-            logger.info(f"🔄 Получены новые cookies: steamLoginSecure={new_cookies['steamLoginSecure'][:20]}..., sessionid={new_cookies['sessionid']}")
-            
-            # 3. Создаем новые куки путем замены значений sessionid и steamLoginSecure во всех доменах старых куки
-            cookies_updated = 0
-            for domain, paths in old_session_dict['cookies'].items():
-                for path, cookies in paths.items():
-                    # Обновляем steamLoginSecure если есть
-                    if 'steamLoginSecure' in cookies:
-                        cookies['steamLoginSecure']['value'] = new_cookies['steamLoginSecure']
-                        cookies_updated += 1
-                        logger.info(f"  ✅ Обновлен steamLoginSecure в домене {domain}")
-                    
-                    # Обновляем sessionid если есть
-                    if 'sessionid' in cookies:
-                        cookies['sessionid']['value'] = new_cookies['sessionid']
-                        cookies_updated += 1
-                        logger.info(f"  ✅ Обновлен sessionid в домене {domain}")
-            
-            # Обновляем cookies в сессии по ключам во всех доменах
-            for session_cookie in self._session.cookies:
-                if session_cookie.name == 'steamLoginSecure':
-                    session_cookie.value = new_cookies['steamLoginSecure']
-                    logger.info(f"  🔄 Обновлен steamLoginSecure в сессии для домена {session_cookie.domain}")
-                elif session_cookie.name == 'sessionid':
-                    session_cookie.value = new_cookies['sessionid']
-                    logger.info(f"  🔄 Обновлен sessionid в сессии для домена {session_cookie.domain}")
-            
-            self.was_login_executed = True
-
-            # 4. Сохраняем в БД + pkl
-            if self.session_path:
-                self.save_session(os.path.dirname(self.session_path), self.username)
-                logger.info(f"💾 Сессия сохранена в pkl для {self.username}")
-            
-            new_session_dict = session_to_dict(self._session)
-            logger.info(f"📋 Новые cookies: {new_session_dict}")
-            
-            # Сохраняем новые cookies в JSON для отладки
-            new_cookies_file = debug_dir / f"{self.username}_new_cookies.json"
-            with open(new_cookies_file, 'w', encoding='utf-8') as f:
-                json.dump(new_session_dict, f, indent=2, ensure_ascii=False)
-            
-            # Сохраняем cookies в БД если storage доступен
-            if self.storage and self.username:
-                try:
-                    if self.storage.save_cookies(self.username, new_session_dict):
-                        logger.info(f"💾 Cookies сохранены в БД для {self.username}")
-                    else:
-                        logger.warning(f"⚠️ Не удалось сохранить cookies в БД для {self.username}")
-                except Exception as e:
-                    logger.error(f"❌ Ошибка сохранения cookies в БД: {e}")
-            
-            logger.info(f"✅ Сессия обновлена через refresh токен для {self.username} (обновлено {cookies_updated} cookies)")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка обновления сессии для {self.username}: {e}")
-            return False
 
     def login_if_need_to(self):        
         if not self.check_session_static(self.username, self._session):
@@ -314,8 +333,8 @@ class SteamClient:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
         }
         main_page_response = self._session.get(SteamUrl.COMMUNITY_URL, headers=headers)
-        print(main_page_response.status_code)
-        print(main_page_response.text)
+        #print(main_page_response.status_code)
+        #print(main_page_response.text)
         return steam_login.lower() in main_page_response.text.lower()
 
     def api_call(

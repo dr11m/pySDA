@@ -155,9 +155,6 @@ class MarketHandler:
         except Exception as e:
             logger.error(f"❌ Ошибка получения подтверждений через Guard: {e}")
             return []
-    
-
-    
 
     
     def _display_confirmations(self, confirmations: List[dict]):

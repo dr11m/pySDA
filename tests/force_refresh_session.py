@@ -73,12 +73,6 @@ def example_new_cookies_method():
         print(f"✅ Получены cookies:")
         print(f"  - steamLoginSecure: {new_cookies['steamLoginSecure'][:20]}...")
         print(f"  - sessionid: {new_cookies['sessionid']}")
-        
-        # Форматируем cookies для домена
-        formatted = client.format_cookies_for_domain(new_cookies, "steamcommunity.com")
-        print(f"📋 Отформатированные cookies:")
-        for cookie in formatted:
-            print(f"  - {cookie}")
             
     except Exception as e:
         print(f"❌ Ошибка: {e}")
@@ -91,7 +85,3 @@ if __name__ == '__main__':
     # Запускаем примеры
     example_refresh_session()
     #example_new_cookies_method()
-    
-    print("\n" + "=" * 70)
-    print("📝 Примечание: Замените 'your_username' и 'your_refresh_token_here' на реальные значения")
-    print("💡 Для запуска теста используйте: python tests/test_refresh_session.py username") 
