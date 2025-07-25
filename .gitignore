@@ -192,3 +192,4 @@ debug_confirmations_page.txt
 # Debug files
 debug_*.json
 debug_*.txt
+debug_info/*
