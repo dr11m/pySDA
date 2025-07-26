@@ -38,6 +38,7 @@ from .utils import (
 
 from src.utils.logger_setup import logger
 from src.interfaces.storage_interface import CookieStorageInterface
+from src.utils.cookies_and_session import session_to_dict
 
 
 class SteamClient:
@@ -243,9 +244,10 @@ class SteamClient:
             self.was_login_executed = True
             
             # Сохраняем сессию
-            if self.session_path:
-                self.save_session(os.path.dirname(self.session_path), self.username)
-                logger.info(f"💾 Сессия сохранена в pkl для {self.username}")
+            self.save_session(os.path.dirname(self.session_path), self.username)
+            logger.info(f"💾 Сессия сохранена в pkl и в хранилище для {self.username}")
+
+            #TODO обновить куки для этого юзера в БД через implementations смотри cookie_storage_interface.py
             
             # Логируем новые cookies
             logger.info(f"📋 Новые cookies: {self._session.__dict__}")
@@ -256,6 +258,8 @@ class SteamClient:
             if not self.check_session_static(self.username, self._session):
                 logger.info(f"❌ Сессия была обновлена через refresh token, но не прошла проверку {self.username})")
                 return False
+            
+            # Обновляем cookies в БД через implementations и
             
             return True
             
@@ -289,9 +293,13 @@ class SteamClient:
             self._session.cookies.clear()
             session, refresh_token = LoginExecutor(self.username, self._password, self.steam_guard['shared_secret'], self._session).login()
             self.refresh_token = refresh_token
+            self._session = session
             print(f"💾 Получен новый refresh токен для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
+            # Сохраняем сессию
+            self.save_session(os.path.dirname(self.session_path), self.username)
+            logger.info(f"💾 Сессия сохранена в pkl и в хранилище для {self.username}")
         else:
             print(f"✅ Сессия активна для {self.username}")
             self.was_login_executed = True
@@ -307,6 +315,19 @@ class SteamClient:
         with open(os.path.join(path, f'{username}.pkl'), 'wb') as f:
             pickle.dump((self._session, self.refresh_token), f)
         print(f"💾 Сессия и refresh токен сохранены в pkl для {username}")
+        
+        # Обновляем cookies в БД через implementations
+        if hasattr(self, 'storage') and self.storage:
+            try:
+                cookies_dict = session_to_dict(self._session)
+                if self.storage.save_cookies(username, cookies_dict):
+                    logger.info(f"💾 Cookies обновлены в БД при сохранении сессии для {username}")
+                else:
+                    logger.warning(f"⚠️ Не удалось обновить cookies в БД при сохранении сессии для {username}")
+            except Exception as e:
+                logger.error(f"❌ Ошибка обновления cookies в БД при сохранении сессии для {username}: {e}")
+        else:
+            logger.info(f"ℹ️ Storage не настроен, пропускаем обновление cookies в БД для {username}")
 
     @login_required
     def logout(self) -> None:

@@ -1,10 +1,10 @@
 # Steam Session Management - Python Implementation
 
-_try_refresh_session() метод предоставляет Python реализацию обновления Steam сессий, основанную на [node-steam-session](https://github.com/DoctorMcKay/node-steam-session).
+Метод `_try_refresh_session()` предоставляет Python реализацию обновления Steam сессий, основанную на [node-steam-session](https://github.com/DoctorMcKay/node-steam-session).
 
 ## Обзор
 
-Реализация воспроизводит ключевую функциональность оригинальной библиотеки для получения веб-куки Steam через refresh-токены, используя минималистичный подход с оптимизированным количеством HTTP-запросов.
+Реализация воспроизводит ключевую функциональность оригинальной библиотеки для получения веб-куки Steam через refresh-токены. **Критическое исправление**: теперь корректно обрабатывает domain-specific токены для каждого домена Steam вместо использования одного токена для всех доменов.
 
 ## Основанные методы
 
@@ -21,29 +21,142 @@ _try_refresh_session() метод предоставляет Python реализ
 
 ### 3. Transfer Info Processing
 - **Оригинал**: [`src/LoginSession.js#_doTransferLogin`](https://github.com/DoctorMcKay/node-steam-session/blob/master/src/LoginSession.js)
-- **Оптимизация**: Используем только первый transfer запрос для получения `steamLoginSecure`
+- **Исправление**: Теперь выполняем **ВСЕ** transfer запросы для получения корректных токенов для каждого домена
+
+## Ключевая проблема и её решение
+
+### Проблема (версия 2.2.0)
+```python
+# НЕПРАВИЛЬНО: Один токен для всех доменов
+steam_login_secure = get_first_token()  # Только store.steampowered.com
+# Результат: {"aud": ["web:store"]} для steamcommunity.com - ОШИБКА!
+```
+
+### Решение (версия 2.2.1)
+```python
+# ПРАВИЛЬНО: Domain-specific токены
+domain_tokens = {
+    'steamcommunity.com': token_with_community_aud,    # {"aud": ["web:community"]}
+    'store.steampowered.com': token_with_store_aud,    # {"aud": ["web:store"]}
+    'help.steampowered.com': token_with_help_aud       # {"aud": ["web:help"]}
+}
+```
 
 ## Использование
 
 ```python
-from steam_session import get_steam_login_cookies, format_cookies_for_domain
+# Создание клиента с автоматическим обновлением сессии
+client = SteamClient(username="your_username")
 
-# Получение куки из refresh-токена
-cookies = get_steam_login_cookies(refresh_token)
-print(f"steamLoginSecure: {cookies['steamLoginSecure']}")
-print(f"sessionid: {cookies['sessionid']}")
+# Метод автоматически попробует обновить сессию через refresh токен
+if client._try_refresh_session():
+    print("✅ Сессия успешно обновлена через refresh токен")
+    # Теперь все domain-specific токены корректны
+else:
+    print("❌ Требуется полная авторизация")
+    client.login(username, password, two_factor_code)
+```
 
-# Форматирование для конкретного домена
-formatted = format_cookies_for_domain(cookies, 'steamcommunity.com')
+## Архитектура метода
+
+### 1. get_steam_login_cookies()
+```python
+def get_steam_login_cookies(self, refresh_token: str) -> dict:
+    """
+    Получает domain-specific токены для каждого Steam домена
+    """
+    # Шаг 1: Получение transfer_info
+    result = self._session.post('/jwt/finalizelogin', ...)
+    transfer_info = result['transfer_info']
+    
+    # Шаг 2: Выполнение ВСЕХ transfer запросов
+    domain_tokens = {}
+    for transfer in transfer_info:
+        domain = extract_domain(transfer['url'])
+        token = execute_transfer_request(transfer)
+        domain_tokens[domain] = token  # Сохраняем по домену
+    
+    return {
+        'domain_tokens': domain_tokens,
+        'sessionid': generated_session_id
+    }
+```
+
+### 2. _try_refresh_session()
+```python
+def _try_refresh_session(self) -> bool:
+    """
+    Обновляет сессию с корректными токенами для каждого домена
+    """
+    # Получаем domain-specific токены
+    cookies_data = self.get_steam_login_cookies(self.refresh_token)
+    domain_tokens = cookies_data['domain_tokens']
+    
+    # Обновляем существующие cookies правильными токенами
+    for cookie in self._session.cookies:
+        if cookie.name == 'steamLoginSecure':
+            domain = cookie.domain
+            if domain in domain_tokens:
+                cookie.value = domain_tokens[domain]  # Правильный токен для домена
+    
+    # Проверяем валидность обновленной сессии
+    return self.check_session_static(self.username, self._session)
 ```
 
 ## Ключевые отличия от оригинала
 
-1. **Упрощенный подход**: Один transfer запрос вместо обработки всех
-2. **Фокус на основном**: Только `steamLoginSecure` и `sessionid`
-3. **Минимальные зависимости**: Только `requests` и стандартные библиотеки
+1. **Точная реализация transfer_info**: Выполнение всех transfer запросов как в оригинале
+2. **Domain-specific токены**: Корректное сопоставление токенов с соответствующими доменами
+3. **Детальное логирование**: Сохранение всех отладочных сообщений и проверок
+4. **Валидация сессии**: Токены проходят проверку для всех Steam доменов
 
-## Задача: Автоматическое обновление Refresh Token
+## Поддерживаемые домены
+
+- `steamcommunity.com` - основной домен сообщества Steam
+- `store.steampowered.com` - магазин Steam
+- `help.steampowered.com` - служба поддержки
+- `login.steampowered.com` - сервис аутентификации
+
+## Диагностика проблем
+
+### Проверка корректности токенов
+```python
+import base64, json
+
+def decode_steam_token(token):
+    """Декодирует JWT токен для проверки audience"""
+    parts = token.split('.')
+    payload = json.loads(base64.b64decode(parts[1] + '=='))
+    return payload['aud']  # Показывает для какого домена токен
+
+# Пример использования
+for domain, token in domain_tokens.items():
+    audience = decode_steam_token(token)
+    print(f"Домен: {domain}, Audience: {audience}")
+```
+
+### Типичные ошибки
+- `{"success":false,"needauth":true}` - неправильный токен для домена
+- `ExpiredToken` - refresh токен истек, нужна полная авторизация
+- `InvalidAudience` - токен с `web:store` используется для `steamcommunity.com`
+
+## Интеграция с основной функциональностью
+
+```python
+# Автоматическое обновление при создании клиента
+client = SteamClient(username="account_name")
+# Клиент автоматически попробует обновить сессию через refresh токен
+
+# Ручная проверка и обновление
+if not client.check_session_static(username, session):
+    if client._try_refresh_session():
+        print("✅ Сессия обновлена через refresh токен")
+    else:
+        print("❌ Требуется полная авторизация")
+        client.login(username, password, two_factor_code)
+```
+
+## Автоматическое обновление Refresh Token
 
 ### Проблема
 Refresh-токены в Steam имеют ограниченный срок жизни (~90 дней) и требуют периодического обновления для поддержания сессии без повторного ввода логина и пароля.
@@ -182,10 +295,12 @@ def get_steam_cookies_with_auto_renewal(token_manager: SteamTokenManager):
         raise e
 ```
 
-### Ссылки на оригинальную документацию
+## Ссылки на оригинальную документацию
 
-- [LoginSession.renewRefreshToken()](https://github.com/DoctorMcKay/node-steam-session#renewrefreshtokenforcerenew) - основной метод обновления
+- [LoginSession.getWebCookies()](https://github.com/DoctorMcKay/node-steam-session#getwebcookies) - основной метод получения куки
+- [LoginSession.renewRefreshToken()](https://github.com/DoctorMcKay/node-steam-session#renewrefreshtokenforcerenew) - метод обновления токенов
 - [События refreshTokenUpdated](https://github.com/DoctorMcKay/node-steam-session#refreshtokenupdated) - событие при обновлении токена
+- [Transfer Info Processing](https://github.com/DoctorMcKay/node-steam-session/blob/master/src/LoginSession.js) - обработка transfer_info
 - [Управление токенами](https://github.com/DoctorMcKay/node-steam-session#token-management) - общая документация по токенам
 
 ## Лицензия
