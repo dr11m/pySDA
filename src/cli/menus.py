@@ -562,6 +562,12 @@ class AutoMenu(NavigableMenu):
         ))
         
         self.add_item(MenuItem(
+            AutoMenuChoice.MANAGE_AUTO_ACCOUNTS.value,
+            Messages.MANAGE_AUTO_ACCOUNTS,
+            self.manage_auto_accounts
+        ))
+        
+        self.add_item(MenuItem(
             AutoMenuChoice.BACK.value,
             Messages.BACK,
             self.go_back
@@ -569,29 +575,33 @@ class AutoMenu(NavigableMenu):
 
     def _get_accounts_with_automation(self) -> List[Dict[str, Any]]:
         """Получить список аккаунтов с активными настройками автоматизации"""
-        # Получаем все аккаунты
-        try:
-            # Попробуем получить список аккаунтов через config_manager
-            if hasattr(self.cli, 'config_manager') and hasattr(self.cli.config_manager, 'get_all_account_names'):
-                account_names = self.cli.config_manager.get_all_account_names()
-            else:
-                # Fallback: поиск файлов .maFile в директории
-                accounts_dir = Path(getattr(self.cli, 'accounts_dir', 'accounts_info'))
-                mafiles = list(accounts_dir.glob('*.maFile'))
-                account_names = [f.stem for f in mafiles]
-        except Exception:
-            # Еще один fallback
-            accounts_dir = Path('accounts_info')
-            if accounts_dir.exists():
-                mafiles = list(accounts_dir.glob('*.maFile'))
-                account_names = [f.stem for f in mafiles]
-            else:
-                account_names = []
+        # Путь к файлу с аккаунтами для автоматизации
+        accounts_to_automate_file = Path("accounts_info/accounts_to_automate.json")
+        
+        # Загружаем список аккаунтов для автоматизации
+        auto_account_names = []
+        if accounts_to_automate_file.exists():
+            try:
+                with open(accounts_to_automate_file, 'r', encoding='utf-8') as f:
+                    auto_account_names = json.load(f)
+            except Exception as e:
+                print_and_log(f"⚠️ Ошибка чтения файла {accounts_to_automate_file}: {e}", "WARNING")
+                auto_account_names = []
+        
+        # Проверяем, есть ли аккаунты в списке
+        if not auto_account_names:
+            print_and_log("❌ Список аккаунтов для автоматизации пуст!", "ERROR")
+            print_and_log("")
+            print_and_log("💡 Для настройки аккаунтов используйте:")
+            print_and_log("   • Пункт '4. 📝 Управление аккаунтами для автоматизации' в меню автоматизации")
+            print_and_log("   • Или отредактируйте файл accounts_info/accounts_to_automate.json вручную")
+            print_and_log("")
+            return []
 
         accounts_with_automation = []
         accounts_dir = Path(getattr(self.cli, 'accounts_dir', 'accounts_info'))
         
-        for account_name in account_names:
+        for account_name in auto_account_names:
             try:
                 # Загружаем настройки для каждого аккаунта
                 settings_file = accounts_dir / f"{account_name}_auto_settings.json"
@@ -617,9 +627,10 @@ class AutoMenu(NavigableMenu):
                             'settings': settings,
                             'interval': settings.check_interval
                         })
+                    else:
+                        print_and_log(f"⚠️ Аккаунт '{account_name}' в списке автоматизации, но не имеет активных настроек", "WARNING")
                 else:
-                    # Если файла настроек нет, аккаунт не участвует в автоматизации
-                    continue
+                    print_and_log(f"⚠️ Аккаунт '{account_name}' в списке автоматизации, но файл настроек не найден", "WARNING")
                     
             except Exception as e:
                 print_and_log(f"⚠️ Ошибка загрузки настроек для {account_name}: {e}", "WARNING")
@@ -633,9 +644,12 @@ class AutoMenu(NavigableMenu):
         print_and_log("")
         
         if not accounts:
-            print_and_log("❌ Нет аккаунтов с настроенной автоматизацией!", "ERROR")
+            print_and_log("❌ Нет аккаунтов для автоматизации!", "ERROR")
             print_and_log("")
-            print_and_log("💡 Настройте автоматизацию через пункт '1. Настройки автоматизации'")
+            print_and_log("💡 Для настройки автоматизации:")
+            print_and_log("   1. Добавьте аккаунты в список автоматизации через пункт '4. 📝 Управление аккаунтами для автоматизации'")
+            print_and_log("   2. Настройте параметры автоматизации для каждого аккаунта через пункт '1. ⚙️ Настройки автоматизации'")
+            print_and_log("")
             input("Нажмите Enter для продолжения...")
             return False
         
@@ -719,6 +733,92 @@ class AutoMenu(NavigableMenu):
             print_and_log(f"❌ Ошибка запуска автоматизации: {e}", "ERROR")
             input(Messages.PRESS_ENTER)
             return False
+
+    def manage_auto_accounts(self):
+        """Управление аккаунтами для автоматизации"""
+        # Путь к файлу с аккаунтами для автоматизации
+        accounts_to_automate_file = Path("accounts_info/accounts_to_automate.json")
+        
+        # Получаем все имена аккаунтов из config.yaml
+        try:
+            if hasattr(self.cli, 'config_manager') and hasattr(self.cli.config_manager, 'get_all_account_names'):
+                all_account_names = self.cli.config_manager.get_all_account_names()
+            else:
+                # Fallback: поиск файлов .maFile в директории
+                accounts_dir = Path(getattr(self.cli, 'accounts_dir', 'accounts_info'))
+                mafiles = list(accounts_dir.glob('*.maFile'))
+                all_account_names = [f.stem for f in mafiles]
+        except Exception:
+            accounts_dir = Path('accounts_info')
+            if accounts_dir.exists():
+                mafiles = list(accounts_dir.glob('*.maFile'))
+                all_account_names = [f.stem for f in mafiles]
+            else:
+                all_account_names = []
+        
+        if not all_account_names:
+            print_and_log("❌ Не найдено ни одного аккаунта в config.yaml.", "ERROR")
+            input("Нажмите Enter для продолжения...")
+            return
+        
+        # Основной цикл меню
+        while True:
+            # Загружаем актуальный список аккаунтов для автоматизации
+            auto_accounts = []
+            if accounts_to_automate_file.exists():
+                try:
+                    with open(accounts_to_automate_file, 'r', encoding='utf-8') as f:
+                        auto_accounts = json.load(f)
+                except Exception as e:
+                    print_and_log(f"⚠️ Ошибка чтения файла {accounts_to_automate_file}: {e}", "WARNING")
+                    auto_accounts = []
+            
+            # Очищаем экран и показываем заголовок
+            print_and_log(self.formatter.format_section_header("📝 Управление аккаунтами для автоматизации"))
+            
+            print_and_log("Доступные аккаунты:")
+            for i, name in enumerate(all_account_names, 1):
+                status = "✅" if name in auto_accounts else "❌"
+                print_and_log(f"  {i}. {name} {status}")
+            
+            print_and_log(f"  0. ⬅️  Назад")
+            print_and_log("\nВыберите аккаунт для переключения:")
+            
+            try:
+                choice = input("Ваш выбор: ").strip()
+                if choice == "0":
+                    return
+                    
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(all_account_names):
+                    selected_account = all_account_names[choice_num - 1]
+                    
+                    # Переключаем статус аккаунта
+                    if selected_account in auto_accounts:
+                        auto_accounts.remove(selected_account)
+                        print_and_log(f"❌ Аккаунт '{selected_account}' удален из автоматизации")
+                    else:
+                        auto_accounts.append(selected_account)
+                        print_and_log(f"✅ Аккаунт '{selected_account}' добавлен в автоматизацию")
+                    
+                    # Сохраняем обновленный список
+                    try:
+                        with open(accounts_to_automate_file, 'w', encoding='utf-8') as f:
+                            json.dump(auto_accounts, f, indent=2, ensure_ascii=False)
+                        print_and_log(f"💾 Список аккаунтов для автоматизации сохранен в {accounts_to_automate_file}")
+                    except Exception as e:
+                        print_and_log(f"❌ Ошибка сохранения файла: {e}", "ERROR")
+                    
+                    # Небольшая пауза для показа результата
+                    input("Нажмите Enter для продолжения...")
+                    
+                else:
+                    print_and_log("❌ Неверный выбор.", "ERROR")
+                    input("Нажмите Enter для продолжения...")
+                    
+            except (ValueError, IndexError):
+                print_and_log("❌ Некорректный ввод.", "ERROR")
+                input("Нажмите Enter для продолжения...")
 
     def configure_other_account_settings(self):
         """Настроить автоматизацию для другого аккаунта"""
