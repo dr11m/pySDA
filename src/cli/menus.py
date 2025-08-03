@@ -21,6 +21,7 @@ from .password_manager import PasswordManager
 from src.utils.logger_setup import print_and_log
 from pathlib import Path
 import json
+import requests
 
 
 class MainMenu(BaseMenu):
@@ -30,6 +31,7 @@ class MainMenu(BaseMenu):
         # Название будет обновляться динамически
         super().__init__("") 
         self.cli = cli_context
+        self.formatter = DisplayFormatter()
     
     def _update_title(self):
         """Обновляет заголовок меню, чтобы показать выбранный аккаунт."""
@@ -52,6 +54,12 @@ class MainMenu(BaseMenu):
             MenuChoice.AUTOMATION.value,
             Messages.AUTOMATION,
             self.open_auto_menu
+        ))
+        
+        self.add_item(MenuItem(
+            MenuChoice.CHECK_PROXIES.value,
+            Messages.CHECK_PROXIES,
+            self.check_all_proxies
         ))
         
         self.add_item(MenuItem(
@@ -80,6 +88,142 @@ class MainMenu(BaseMenu):
         """Открыть меню автоматизации"""
         auto_menu = AutoMenu(self.cli)
         auto_menu.run()
+    
+    def check_all_proxies(self):
+        """Проверить прокси всех активных аккаунтов"""
+        print_and_log(self.formatter.format_section_header("🌐 Проверка прокси всех аккаунтов"))
+        
+        try:
+            # Получаем все аккаунты из конфига
+            if not hasattr(self.cli, 'config_manager') or not hasattr(self.cli.config_manager, 'get_all_account_names'):
+                print_and_log("❌ Не удалось получить список аккаунтов", "ERROR")
+                input("Нажмите Enter для продолжения...")
+                return
+            
+            account_names = self.cli.config_manager.get_all_account_names()
+            if not account_names:
+                print_and_log("❌ Не найдено ни одного аккаунта в конфигурации", "ERROR")
+                input("Нажмите Enter для продолжения...")
+                return
+            
+            print_and_log(f"📋 Найдено {len(account_names)} аккаунтов для проверки")
+            print_and_log("🔄 Начинаем проверку прокси...")
+            print_and_log("")
+            
+            # Получаем IP без прокси для сравнения
+            print_and_log("🌐 Получение IP без прокси...")
+            try:
+                response = requests.get("https://api.ipify.org?format=json", timeout=10)
+                if response.status_code == 200:
+                    direct_ip = response.json().get('ip', 'N/A')
+                    print_and_log(f"✅ IP без прокси: {direct_ip}")
+                else:
+                    direct_ip = 'N/A'
+                    print_and_log("⚠️ Не удалось получить IP без прокси", "WARNING")
+            except Exception as e:
+                direct_ip = 'N/A'
+                print_and_log(f"⚠️ Ошибка получения IP без прокси: {e}", "WARNING")
+            
+            print_and_log("")
+            print_and_log("📊 Результаты проверки прокси:")
+            print_and_log("─" * 80)
+            print_and_log(f"{'Аккаунт':<20} {'Назначенный IP:Port':<25} {'Полученный IP':<15} {'Статус':<10}")
+            print_and_log("─" * 80)
+            
+            results = []
+            
+            for account_name in account_names:
+                try:
+                    # Получаем прокси через имплементацию (как в account_context.py)
+                    try:
+                        from src.factories import create_instance_from_config
+                        
+                        # Получаем конфигурацию провайдера прокси из config_manager
+                        proxy_provider_config = self.cli.config_manager.get('proxy_provider')
+                        if not proxy_provider_config:
+                            assigned_proxy = 'N/A'
+                            received_ip = 'N/A'
+                        else:
+                            # Создаем экземпляр провайдера прокси
+                            proxy_provider = create_instance_from_config(proxy_provider_config)
+                            proxy_dict = proxy_provider.get_proxy(account_name)
+                            
+                            if proxy_dict:
+                                # proxy_dict уже содержит правильный формат для requests
+                                # например: {'http': 'http://user:pass@host:port', 'https': 'http://user:pass@host:port'}
+                                assigned_proxy = proxy_dict.get('http', 'N/A').replace('http://', '').replace('https://', '')
+                                
+                                # Делаем запрос через прокси
+                                response = requests.get("https://api.ipify.org?format=json", proxies=proxy_dict, timeout=10)
+                                if response.status_code == 200:
+                                    received_ip = response.json().get('ip', 'N/A')
+                                else:
+                                    received_ip = 'N/A'
+                            else:
+                                assigned_proxy = 'no_proxy'
+                                # Делаем запрос без прокси
+                                response = requests.get("https://api.ipify.org?format=json", timeout=10)
+                                if response.status_code == 200:
+                                    received_ip = response.json().get('ip', 'N/A')
+                                else:
+                                    received_ip = 'N/A'
+                    except Exception as e:
+                        assigned_proxy = 'N/A'
+                        received_ip = 'N/A'
+                    
+                    # Определяем статус
+                    if received_ip != 'N/A' and received_ip != direct_ip:
+                        status = "✅"
+                        status_text = "РАБОТАЕТ"
+                    elif received_ip == direct_ip and assigned_proxy != 'no_proxy':
+                        status = "❌"
+                        status_text = "НЕ РАБОТАЕТ"
+                    elif received_ip == direct_ip and assigned_proxy == 'no_proxy':
+                        status = "✅"
+                        status_text = "OK"
+                    else:
+                        status = "❌"
+                        status_text = "ОШИБКА"
+                    
+                    # Выводим результат
+                    print_and_log(f"{account_name:<20} {assigned_proxy:<25} {received_ip:<15} {status} {status_text}")
+                    
+                    results.append({
+                        'account': account_name,
+                        'assigned_proxy': assigned_proxy,
+                        'received_ip': received_ip,
+                        'status': status,
+                        'status_text': status_text
+                    })
+                    
+                except Exception as e:
+                    print_and_log(f"❌ Ошибка проверки {account_name}: {e}", "ERROR")
+                    print_and_log(f"{account_name:<20} {'N/A':<25} {'N/A':<15} ❌ ОШИБКА")
+            
+            print_and_log("─" * 80)
+            
+            # Статистика
+            working_proxies = len([r for r in results if r['status'] == "✅"])
+            total_accounts = len(results)
+            
+            print_and_log(f"📊 Статистика:")
+            print_and_log(f"   • Всего аккаунтов: {total_accounts}")
+            print_and_log(f"   • Работающих прокси: {working_proxies}")
+            print_and_log(f"   • Проблемных: {total_accounts - working_proxies}")
+            
+            if working_proxies < total_accounts:
+                print_and_log("")
+                print_and_log("⚠️ Обнаружены проблемы с прокси:")
+                for result in results:
+                    if result['status'] == "❌":
+                        print_and_log(f"   • {result['account']}: {result['status_text']}")
+            
+            print_and_log("")
+            input("Нажмите Enter для продолжения...")
+            
+        except Exception as e:
+            print_and_log(f"❌ Критическая ошибка при проверке прокси: {e}", "ERROR")
+            input("Нажмите Enter для продолжения...")
     
     def exit_app(self):
         """Выйти из приложения"""
