@@ -14,6 +14,7 @@ from src.steampy.client import SteamClient
 from src.interfaces.storage_interface import CookieStorageInterface as StorageInterface
 from src.utils.delayed_http_adapter import DelayedHTTPAdapter
 from src.utils.cookies_and_session import session_to_dict
+from src.utils.logger_setup import print_and_log
 
 
 class CookieManager:
@@ -55,7 +56,8 @@ class CookieManager:
             password=password,
             steam_guard=mafile_path,
             steam_id=steam_id,
-            proxies=proxy
+            proxies=proxy,
+            storage=storage
         )
 
         # И здесь же монтируем адаптер, если это необходимо
@@ -63,7 +65,7 @@ class CookieManager:
             adapter = DelayedHTTPAdapter(delay=request_delay_sec)
             self.client._session.mount('http://', adapter)
             self.client._session.mount('https://', adapter)
-            logger.debug(f"Для клиента '{username}' установлен HTTP адаптер с задержкой {request_delay_sec:.2f} сек.")
+            logger.debug(f"Для клиента '{username}' установлен HTTP/S адаптер с задержкой {request_delay_sec:.2f} сек.")
         
         logger.info(f"🍪 Cookie Manager инициализирован для {username}")
         logger.info(f"📁 Сессии: {self.session_file}")
@@ -72,7 +74,6 @@ class CookieManager:
             logger.info(f"🌐 Используется прокси: {self.proxy.get('http')}")
     
 
-    
     def dict_to_session_cookies(self, cookies_dict: Dict[str, str], session) -> bool:
         """Загрузка cookies из словаря в сессию"""
         try:
@@ -93,7 +94,8 @@ class CookieManager:
                 password=self.password,
                 steam_id=self.steam_id,
                 steam_guard=self.mafile_path,
-                proxies=self.proxy
+                proxies=self.proxy,
+                storage=self.storage
             )
             
             # Устанавливаем HTTP адаптер с задержкой если она настроена
@@ -233,10 +235,11 @@ class CookieManager:
             
             logger.info(f"🔄 [{datetime.now().strftime('%H:%M:%S')}] Обновление cookies для {self.username}")
             
-            # Выполняем вход и получаем новую сессию
-            if not self._login_and_save_session():
-                logger.error("❌ Не удалось войти в Steam")
-                return None
+            print_and_log(f"🔄 Обновление cookies (сессии) для {self.username}")
+            if not self.steam_client:
+                self.steam_client = self._create_steam_client()
+            
+            self.steam_client.update_session()
             
             # Получаем cookies из сессии
             cookies = session_to_dict(self.steam_client._session)

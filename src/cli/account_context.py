@@ -25,6 +25,7 @@ class AccountContext:
     trade_manager: TradeConfirmationManager
     cookie_checker: CookieChecker
     accounts_dir: str
+    config_manager: ConfigManager
 
 def build_account_context(config_manager: ConfigManager, account_name: str) -> Optional[AccountContext]:
     """
@@ -99,7 +100,8 @@ def build_account_context(config_manager: ConfigManager, account_name: str) -> O
             cookie_manager=cookie_manager,
             trade_manager=trade_manager,
             cookie_checker=cookie_checker,
-            accounts_dir=accounts_dir
+            accounts_dir=accounts_dir,
+            config_manager=config_manager
         )
 
     except Exception as e:
