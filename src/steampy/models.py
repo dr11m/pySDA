@@ -98,6 +98,9 @@ class TradeOfferState(IntEnum):
     CanceledBySecondFactor = 10   # Either party canceled the offer via email/mobile confirmation
     InEscrow = 11         # The trade has been placed on hold
 
+class EResult:
+    OK = 1
+    AccessDenied = 5
 
 class SteamUrl:
     API_URL = 'https://api.steampowered.com'
@@ -401,6 +404,11 @@ class EnumWithMultipleValues(Enum):
     def _missing_(cls, value):
         # Handle cases where the value doesn't directly map to a member
         return cls._alt_map.get(value, super()._missing_(value))
+
+
+class TransferResult:
+    OK = 1
+    AccessDenied = 5
 
 
 # https://github.com/DoctorMcKay/node-steamcommunity/blob/master/resources/EResult.js

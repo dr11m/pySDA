@@ -134,7 +134,7 @@ class SteamBotCLI:
                 return False
                 
         except Exception as e:
-            print(self.formatter.format_error("Ошибка обновления cookies", e))
+            print(self.formatter.format_error("Ошибка обновления cookies (сессии)", e))
             return False
     
     def get_guard_code(self) -> bool:
@@ -296,4 +296,4 @@ def run_cli():
 
 
 if __name__ == "__main__":
-    run_cli() 
+    run_cli()
