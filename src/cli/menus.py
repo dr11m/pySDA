@@ -17,7 +17,7 @@ from src.models import TradeOffer
 from .settings_manager import SettingsManager
 from .auto_manager import AutoManager, AutoSettings
 from .market_handler import MarketHandler
-from .password_manager import PasswordManager
+from .password_changer import PasswordChanger
 from src.utils.logger_setup import print_and_log
 from pathlib import Path
 import json
@@ -347,7 +347,7 @@ class SettingsMenu(NavigableMenu):
         super().__init__(Messages.SETTINGS_TITLE)
         self.cli = cli_context
         self.settings_manager = SettingsManager()
-        self.password_manager = PasswordManager()
+        self.password_changer = None  # Будет создан при необходимости
         self.formatter = DisplayFormatter()
     
     def setup_menu(self):
@@ -456,7 +456,10 @@ class SettingsMenu(NavigableMenu):
         if not self.cli.active_account_context:
             print_and_log("❌ Сначала необходимо выбрать аккаунт (пункт 1 в главном меню)", "ERROR")
             return False
-        return self.password_manager.change_password(self.cli.active_account_context)
+        
+        # Создаем экземпляр PasswordChanger для текущего аккаунта
+        self.password_changer = PasswordChanger(self.cli.active_account_context)
+        return self.password_changer.change_password(self.cli.active_account_context)
     
     def exit_app(self):
         """Выйти из приложения"""
