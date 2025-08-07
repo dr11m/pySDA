@@ -225,7 +225,7 @@ class SteamClient:
 
 
     @staticmethod
-    def check_session_static(username, _session):
+    def check_session_static(username, _session) -> bool:
         main_page_response = _session.get(SteamUrl.COMMUNITY_URL)
         return username.lower() in main_page_response.text.lower()
 
