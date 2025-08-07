@@ -1,41 +1,149 @@
 #  основан на https://github.com/sometastycake/steam-password-change/blob/master/steampassword/chpassword.py
 #!/usr/bin/env python3
 """
-Менеджер паролей для CLI интерфейса
+Менеджер паролей для CLI интерфейса Steam аккаунтов.
+
+Этот модуль предоставляет функциональность для смены паролей Steam аккаунтов
+через официальный интерфейс Steam Help. Основан на оригинальном репозитории
+steam-password-change.
+
+Основные возможности:
+- Валидация надежности паролей
+- Смена пароля через Steam Help интерфейс
+- Поддержка мобильного подтверждения Steam Guard
+- Автоматическое обновление конфигурации
 """
 import base64
 import time
 import urllib.parse
-import json
 import re
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, List
 from .constants import Messages
 from .display_formatter import DisplayFormatter
 from src.utils.logger_setup import print_and_log
 from src.utils.cookies_and_session import session_to_dict, extract_cookies_for_domain
 from src.cli.account_context import AccountContext
 from src.steampy.client import SteamClient
-from src.steampy.confirmation import ConfirmationExecutor
+from src.steampy.confirmation import ConfirmationExecutor, Confirmation
+
+from src.utils.logger_setup import logger
 
 
-class PasswordManager:
+# Константы для улучшения читаемости
+class PasswordConstants:
+    """Константы для работы с паролями и процесса смены пароля."""
+    MIN_PASSWORD_LENGTH = 8
+    STRONG_PASSWORD_LENGTH = 12
+    SPECIAL_CHARS = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    MAX_POLL_ATTEMPTS = 10
+    POLL_DELAY = 3
+    MOBILE_CONFIRMATION_TYPE = 6
+    MOBILE_CONFIRMATION_TYPE_NAME = 'Account details'
+    RSA_ENCODING = 'ascii'
+    RSA_ENCODING_UTF8 = 'utf8'
+
+class HttpConstants:
+    """Константы для HTTP запросов к Steam серверам."""
+    BROWSER_USER_AGENT = (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/'
+        '537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+    )
+    
+    COMMON_HEADERS = {
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Connection': 'keep-alive',
+        'User-Agent': BROWSER_USER_AGENT,
+        'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"'
+    }
+    
+    AJAX_HEADERS = {
+        **COMMON_HEADERS,
+        'Accept': '*/*',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+    
+    FORM_HEADERS = {
+        **COMMON_HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Origin': 'https://help.steampowered.com'
+    }
+
+class SteamUrls:
+    """URL адреса Steam Help для смены пароля."""
+    HELP_CHANGE_PASSWORD = "https://help.steampowered.com/wizard/HelpChangePassword?redir=store/account/"
+    ENTER_CODE = "https://help.steampowered.com/en/wizard/HelpWithLoginInfoEnterCode"
+    SEND_RECOVERY_CODE = "https://help.steampowered.com/en/wizard/AjaxSendAccountRecoveryCode"
+    POLL_CONFIRMATION = "https://help.steampowered.com/en/wizard/AjaxPollAccountRecoveryConfirmation"
+    VERIFY_RECOVERY_CODE = "https://help.steampowered.com/en/wizard/AjaxVerifyAccountRecoveryCode"
+    GET_NEXT_STEP = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryGetNextStep"
+    VERIFY_PASSWORD = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryVerifyPassword/"
+    CHANGE_PASSWORD = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryChangePassword/"
+    GET_RSA_KEY = "https://help.steampowered.com/en/login/getrsakey/"
+    CHECK_PASSWORD_AVAILABLE = "https://help.steampowered.com/en/wizard/AjaxCheckPasswordAvailable/"
+    ACCOUNT_TEST = "https://store.steampowered.com/en/account/"
+
+class HttpRequestHelper:
+    """Вспомогательный класс для работы с HTTP запросами к Steam."""
+    
+    @staticmethod
+    def get_common_headers() -> Dict[str, str]:
+        return HttpConstants.COMMON_HEADERS.copy()
+    
+    @staticmethod
+    def get_ajax_headers() -> Dict[str, str]:
+        return HttpConstants.AJAX_HEADERS.copy()
+    
+    @staticmethod
+    def get_form_headers() -> Dict[str, str]:
+        return HttpConstants.FORM_HEADERS.copy()
+    
+    @staticmethod
+    def build_referer_url(base_url: str, params: Dict[str, str]) -> str:
+        """Построение URL для Referer заголовка из базового URL и параметров."""
+        param_strings = [f"{k}={v}" for k, v in params.items()]
+        return f"{base_url}?{'&'.join(param_strings)}"
+
+
+class PasswordChanger:
     """
-    Менеджер для работы с паролями Steam аккаунтов
-    основан на https://github.com/sometastycake/steam-password-change/blob/master/steampassword/chpassword.py
+    Класс для смены пароля Steam аккаунта.
+    
+    Реализует полный процесс смены пароля через Steam Help интерфейс,
+    включая мобильное подтверждение Steam Guard. Объединяет функциональность
+    PasswordManager и PasswordValidator в единый класс.
+    Основан на https://github.com/sometastycake/steam-password-change
     """
     
-    def __init__(self) -> None:
+    def __init__(self, account_context: AccountContext) -> None:
+        """
+        Инициализация с контекстом аккаунта.
+        
+        Args:
+            account_context: Контекст аккаунта с настроенными прокси и сессией
+        """
+        self.account_context: AccountContext = account_context
         self.formatter: DisplayFormatter = DisplayFormatter()
+        self.http_helper: HttpRequestHelper = HttpRequestHelper()
+        self.username: str = account_context.account_name
+        self.steam_client: Optional[SteamClient] = None
+        
+        # Параметры для восстановления (эквивалент PasswordChangeParams)
+        self.recovery_params: Dict[str, str] = {}
     
     def change_password(self, account_context: AccountContext) -> bool:
         """
-        Смена пароля Steam аккаунта
+        Смена пароля Steam аккаунта.
         
         Args:
-            account_context: Контекст аккаунта
+            account_context: Контекст аккаунта с настроенной сессией
             
         Returns:
-            bool: True если пароль успешно изменен
+            bool: True если пароль успешно изменен, False в противном случае
         """
         try:
             print_and_log(self.formatter.format_section_header("🔒 Смена пароля"))
@@ -43,98 +151,20 @@ class PasswordManager:
             print_and_log("💡 Убедитесь, что у вас есть доступ к мобильному приложению Steam Guard")
             print_and_log("")
             
-            # Создаем экземпляр PasswordChanger
-            password_changer: PasswordChanger = PasswordChanger(account_context)
-            
             # Запускаем процесс смены пароля
-            return password_changer.execute()
+            return self.execute()
             
         except Exception as e:
             print_and_log(f"❌ Ошибка смены пароля: {e}", "ERROR")
             input("Нажмите Enter для продолжения...")
             return False
-    
-    def validate_password_strength(self, password: str) -> Dict[str, Union[bool, int, list]]:
-        """
-        Проверка надежности пароля
-        
-        Args:
-            password: Пароль для проверки
-            
-        Returns:
-            Dict с результатами проверки
-        """
-        result: Dict[str, Union[bool, int, list]] = {
-            'is_valid': True,
-            'score': 0,
-            'issues': []
-        }
-        
-        # Минимальная длина
-        if len(password) < 8:
-            result['issues'].append("Пароль должен содержать минимум 8 символов")
-            result['is_valid'] = False
-        
-        # Проверка наличия букв
-        if not any(c.isalpha() for c in password):
-            result['issues'].append("Пароль должен содержать буквы")
-            result['is_valid'] = False
-        
-        # Проверка наличия цифр
-        if not any(c.isdigit() for c in password):
-            result['issues'].append("Пароль должен содержать цифры")
-            result['is_valid'] = False
-        
-        # Подсчет очков надежности
-        if len(password) >= 12:
-            result['score'] += 2
-        elif len(password) >= 8:
-            result['score'] += 1
-            
-        if any(c.isupper() for c in password):
-            result['score'] += 1
-            
-        if any(c.islower() for c in password):
-            result['score'] += 1
-            
-        if any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password):
-            result['score'] += 2
-            
-        return result
-
-
-class PasswordChanger:
-    """
-    Класс для смены пароля Steam аккаунта
-    Основан на https://github.com/sometastycake/steam-password-change
-    """
-    
-    BROWSER = (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/'
-        '537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
-    )
-    
-    def __init__(self, account_context: AccountContext) -> None:
-        """
-        Инициализация с контекстом аккаунта
-        
-        Args:
-            account_context: Контекст аккаунта с настроенными прокси и сессией
-        """
-        self.account_context: AccountContext = account_context
-        self.formatter: DisplayFormatter = DisplayFormatter()
-        self.username: str = account_context.account_name
-        self.steam_client: Optional[SteamClient] = None
-        
-        # Параметры для восстановления (эквивалент PasswordChangeParams)
-        self.recovery_params: Dict[str, str] = {}
         
     def execute(self) -> bool:
         """
-        Выполнение процесса смены пароля
+        Выполнение процесса смены пароля.
         
         Returns:
-            bool: True если пароль успешно изменен
+            bool: True если пароль успешно изменен, False в противном случае
         """
         try:
             print_and_log(f"🔒 Начинаем смену пароля для аккаунта: {self.username}")
@@ -146,26 +176,26 @@ class PasswordChanger:
                 print_and_log("❌ Не удалось получить Steam клиент", "ERROR")
                 return False
             
-            # Шаг 1: Проверка активности сессии
-            if not self._verify_current_password(""):
+            # Проверка активности сессии
+            if not self._verify_current_session():
                 print_and_log("❌ Сессия неактивна, необходимо войти в аккаунт", "ERROR")
                 return False
             
-            # Шаг 1.5: Проверка наличия Steam Guard данных
+            # Проверка наличия Steam Guard данных
             if not self._verify_steam_guard_data():
                 print_and_log("❌ Отсутствуют данные Steam Guard", "ERROR")
                 return False
             
-            # Шаг 2: Получение нового пароля
+            # Получение нового пароля
             new_password: Optional[str] = self._get_new_password()
             if not new_password:
                 return False
             
-            # Шаг 3: Подтверждение смены
+            # Подтверждение смены
             if not self._confirm_password_change():
                 return False
             
-            # Шаг 4: Полный процесс смены пароля (как в оригинальном репозитории)
+            # Полный процесс смены пароля
             if self._change_password_full_process(new_password):
                 # Обновление конфигурации
                 if self._update_configuration(new_password):
@@ -185,7 +215,13 @@ class PasswordChanger:
     
     def _change_password_full_process(self, new_password: str) -> bool:
         """
-        Полный процесс смены пароля на основе оригинального репозитория
+        Полный процесс смены пароля на основе оригинального репозитория.
+        
+        Args:
+            new_password: Новый пароль для установки
+            
+        Returns:
+            bool: True если процесс завершен успешно
         """
         try:
             print_and_log("🔄 Начинаем полный процесс смены пароля...")
@@ -210,6 +246,10 @@ class PasswordChanger:
             # Шаг 3: Отправка запроса на восстановление (аналог AjaxSendAccountRecoveryCode)
             print_and_log("🔄 Отправка запроса на восстановление...")
             if not self._send_recovery_request():
+                return False
+            
+            print_and_log("🔄 Проверка подтверждения в мобильном приложении...")
+            if not self.confirm_via_guard():
                 return False
             
             # Шаг 4: Поллинг подтверждения (аналог AjaxPollAccountRecoveryConfirmation)
@@ -244,193 +284,93 @@ class PasswordChanger:
             print_and_log(f"❌ Ошибка в процессе смены пароля: {e}", "ERROR")
             return False
     
-    def _check_help_authorization_detailed(self) -> bool:
-        """Детальная проверка авторизации на help.steampowered.com"""
+    def confirm_via_guard(self) -> bool:
+        """
+        Подтверждение смены пароля через мобильное приложение Steam Guard.
+        
+        Returns:
+            bool: True если подтверждение получено успешно
+        """
         try:
-            print_and_log("🔍 Детальная проверка авторизации на help.steampowered.com...")
-            
-            # Проверяем cookies для help домена
-            help_cookies = {}
-            for cookie in self.steam_client._session.cookies:
-                if 'help.steampowered.com' in cookie.domain or cookie.domain == '.steampowered.com':
-                    help_cookies[cookie.name] = cookie.value
-            
-            print_and_log(f"🔍 Cookies для help домена: {list(help_cookies.keys())}")
-            
-            important_cookies = ['steamLoginSecure', 'sessionid']
-            for cookie_name in important_cookies:
-                if cookie_name in help_cookies:
-                    value = help_cookies[cookie_name]
-                    print_and_log(f"✅ {cookie_name}: {value[:20]}..." if len(value) > 20 else f"✅ {cookie_name}: {value}")
-                else:
-                    print_and_log(f"❌ {cookie_name}: НЕ НАЙДЕН для help домена")
-            
-             # Тестируем доступ к защищенной странице help
-            test_urls = [
-                 "https://help.steampowered.com/en",
-                 "https://help.steampowered.com/wizard/",
-                 "https://help.steampowered.com/wizard/HelpChangePassword"
-             ]
-            
-            for test_url in test_urls:
-                print_and_log(f"🔍 Тестируем: {test_url}")
-                response = self.steam_client._session.get(test_url, allow_redirects=False)
-                print_and_log(f"  Статус: {response.status_code}")
-
-                # ГЛАВНАЯ ВАЛИДАЦИЯ: проверяем наличие ника в тексте ответа
-                if self.account_context.account_name.lower() in response.text.lower():
-                    print_and_log(f"✅ {self.account_context.account_name} найден в тексте - АВТОРИЗОВАН")
-                else:
-                    print_and_log(f"❌ {self.account_context.account_name} не найден в тексте - НЕ АВТОРИЗОВАН")
-
-                if response.status_code == 302:
-                    location = response.headers.get('Location', 'Не указано')
-                    print_and_log(f"  Редирект на: {location}")
-                    if '/login' in location:
-                        print_and_log(f"  ❌ Требуется авторизация для {test_url}")
-
-                elif response.status_code == 200:
-                    print_and_log(f"  ✅ Доступ к {test_url} разрешен")
-                else:
-                    print_and_log(f"  ⚠️  Неожиданный статус для {test_url}")
-            
-            # Проверяем, можем ли мы получить страницу смены пароля без редиректа
-            response = self.steam_client._session.get(
-                "https://help.steampowered.com/wizard/HelpChangePassword",
-                allow_redirects=True
+            confirmation_executor = ConfirmationExecutor(
+                identity_secret=self.account_context.cookie_manager.steam_client.steam_guard['identity_secret'],
+                my_steam_id=self.account_context.cookie_manager.steam_client.steam_id,
+                session=self.account_context.cookie_manager.steam_client._session
             )
+            # Получаем JSON с подтверждениями напрямую
+            confirmations_page = confirmation_executor._fetch_confirmations_page()
+            confirmations_json = confirmations_page.json()
             
-            print_and_log(f"🔍 Финальная проверка HelpChangePassword:")
-            print_and_log(f"  Статус: {response.status_code}")
-            print_and_log(f"  URL: {response.url}")
-            
-            # ГЛАВНАЯ ВАЛИДАЦИЯ для финальной проверки
-            if self.account_context.account_name.lower() in response.text.lower():
-                print_and_log(f"✅ {self.account_context.account_name} найден в финальном ответе - АВТОРИЗОВАН")
-                return True
-            else:
-                print_and_log(f"❌ {self.account_context.account_name} НЕ найден в финальном ответе - НЕ АВТОРИЗОВАН")
+            if not confirmations_json.get('success'):
+                logger.error("❌ Не удалось получить мобильные подтверждения")
                 return False
 
-                1
-        except Exception as e:
-            print_and_log(f"❌ Ошибка проверки авторизации: {e}", "ERROR")
-            return False
-
-    def _fix_help_authorization(self) -> bool:
-        """Исправление авторизации для help.steampowered.com"""
-        try:
-            print_and_log("🔧 Попытка исправить авторизацию на help.steampowered.com...")
+            all_confirmations = confirmations_json.get('conf', [])
             
-            # Сначала убедимся, что мы авторизованы на store.steampowered.com
-            print_and_log("🔍 Проверяем авторизацию на store.steampowered.com...")
-            store_response = self.steam_client._session.get(
-                "https://store.steampowered.com/account/",
-                allow_redirects=False
-            )
-            
-            if store_response.status_code == 302 and '/login' in store_response.headers.get('Location', ''):
-                print_and_log("❌ Не авторизованы на store.steampowered.com")
+            if len(all_confirmations) == 0:
+                print_and_log("❌ Нет подтверждений в мобильном приложении")
                 return False
             
-            if self.account_context.account_name.lower() in store_response.text.lower():
-                print_and_log(f"✅ {self.account_context.account_name} найден в тексте - АВТОРИЗОВАН")
+            for confirmation in all_confirmations:
+                # Проверяем тип подтверждения (Account details = 6)
+                if (confirmation.get('type_name', "") == PasswordConstants.MOBILE_CONFIRMATION_TYPE_NAME and 
+                    confirmation.get('type', -1) == PasswordConstants.MOBILE_CONFIRMATION_TYPE):
+                    print_and_log(f"✅ Найдено подтверждение для аккаунта: {confirmation}")
+                    # Проверяем, что это наше подтверждение по creator_id
+                    if confirmation.get('creator_id', "") == self.recovery_params["s"]:
+                        print_and_log(f"✅ Найдено наше подтверждение для аккаунта на смену пароля: {confirmation}")
+                        conf = Confirmation(
+                            data_confid=confirmation['id'],
+                            nonce=confirmation['nonce'],
+                            creator_id=int(confirmation['creator_id'])
+                        )
+                        response = confirmation_executor._send_confirmation(conf)
+                        # Проверяем результат подтверждения
+                        if response and response.get('success'):
+                            return True
+                        else:
+                            error_message = response.get('error', 'Unknown error') if response else 'No response'
+                            logger.error(f"❌ Ошибка подтверждения: {error_message}")
+                            return False
+            
             else:
-                print_and_log(f"❌ {self.account_context.account_name} НЕ найден в тексте - НЕ АВТОРИЗОВАН")
-                return False
-            
-            print_and_log("✅ Авторизованы на store.steampowered.com")
-            
-            # Извлекаем куки с домена steamcommunity.com
-            print_and_log("🔍 Извлекаем куки с домена steamcommunity.com...")
-            cookies_dict = session_to_dict(self.steam_client._session)
-            steamcommunity_cookies = extract_cookies_for_domain(cookies_dict['cookies'], 'steamcommunity.com')
-            
-            print_and_log(f"🔍 Найдено {len(steamcommunity_cookies)} куки для store.steampowered.com")
-            if steamcommunity_cookies:
-                print_and_log(f"🔍 Куки: {list(steamcommunity_cookies.keys())}")
-            
-            # Теперь попробуем получить доступ к help через правильный редирект с куки
-            print_and_log("🔍 Попытка доступа к help через правильный редирект с куки...")
-            
-            # Используем URL, который должен перенаправить нас на help с правильной авторизацией
-            redirect_url = "https://help.steampowered.com/wizard/HelpChangePassword?redir=store/account/"
-            redirect_response = self.steam_client._session.get(
-                redirect_url,
-                allow_redirects=True,
-                cookies=steamcommunity_cookies
-            )
-            
-            print_and_log(f"🔍 Редирект статус: {redirect_response.status_code}")
-            print_and_log(f"🔍 Финальный URL: {redirect_response.url}")
-            
-            # Если редирект привел нас на help домен, проверяем авторизацию
-            if 'help.steampowered.com' in redirect_response.url:
-                print_and_log("✅ Успешно перенаправлены на help.steampowered.com")
-                
-                # ГЛАВНАЯ ВАЛИДАЦИЯ: проверяем наличие ника в тексте ответа
-                if self.account_context.account_name.lower() in redirect_response.text.lower():
-                    print_and_log(f"✅ {self.account_context.account_name} найден в тексте - АВТОРИЗОВАН")
-                    return True
-                else:
-                    print_and_log(f"❌ {self.account_context.account_name} НЕ найден в тексте - НЕ АВТОРИЗОВАН")
-                    return False
-            else:
-                print_and_log("❌ Не удалось получить доступ к help домену")
+                print_and_log("❌ Не найдено подтверждение для аккаунта")
                 return False
             
         except Exception as e:
-            print_and_log(f"❌ Ошибка исправления авторизации: {e}", "ERROR")
+            print_and_log(f"❌ Ошибка в процессе смены пароля (во время подтверждения в мобильном приложении): {e}", "ERROR")
             return False
-    
+
     def _initialize_recovery(self, steam_id: str) -> bool:
         """
-        Инициализация процесса восстановления с исправлением авторизации
-        Аналог _receive_password_change_params из оригинального кода
+        Инициализация процесса восстановления пароля.
+        
+        Аналог _receive_password_change_params из оригинального кода.
+        
+        Args:
+            steam_id: Steam ID аккаунта
+            
+        Returns:
+            bool: True если инициализация прошла успешно
         """
         try:
             print_and_log(f"🔍 Начинаем инициализацию для Steam ID: {steam_id}")
-                        
-            # Извлекаем куки с домена steamcommunity.com для запроса
-            print_and_log("🔍 Извлекаем куки с домена steamcommunity.com для запроса...")
-            cookies_dict = session_to_dict(self.steam_client._session)
-            steamcommunity_cookies = extract_cookies_for_domain(cookies_dict['cookies'], 'steamcommunity.com')
-            
-            print_and_log(f"🔍 Найдено {len(steamcommunity_cookies)} куки для steamcommunity.com")
-            if steamcommunity_cookies:
-                print_and_log(f"🔍 Куки: {list(steamcommunity_cookies.keys())}")
-            
     
             print_and_log("🔍 Отправляем запрос с куки от steamcommunity.com...")
-            
-            cookies = {
-                'steamCountry': steamcommunity_cookies['steamCountry'],
-                'sessionid': steamcommunity_cookies['sessionid'],
-                #'cookieSettings': '%7B%22version%22%3A1%2C%22preference_state%22%3A1%2C%22content_customization%22%3Anull%2C%22valve_analytics%22%3Anull%2C%22third_party_analytics%22%3Anull%2C%22third_party_content%22%3Anull%2C%22utm_enabled%22%3Atrue%7D',
-                #'timezoneOffset': '10800,0',
-                'steamLoginSecure': steamcommunity_cookies['steamLoginSecure'],
-                #'steamAccountRecoveryRedir': 'https%3A%2F%2Fstore.steampowered.com%2Faccount%2F',
-            }
 
             headers = {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                    'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                    'Connection': 'keep-alive',
-                    'Referer': 'https://store.steampowered.com/',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'same-site',
-                    'Sec-Fetch-User': '?1',
-                    'Upgrade-Insecure-Requests': '1',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-                    'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"Windows"',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Referer': 'https://store.steampowered.com/',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-site',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1',
+                **self.http_helper.get_common_headers()
             }
             
             response = self.steam_client._session.get(
-                "https://help.steampowered.com/wizard/HelpChangePassword?redir=store/account/",
-                cookies=cookies,
+                SteamUrls.HELP_CHANGE_PASSWORD,
                 headers=headers,
                 allow_redirects=True
             )
@@ -439,6 +379,12 @@ class PasswordChanger:
             print_and_log(f"🔍 URL ответа: {response.url}")
             print_and_log(f"🔍 История редиректов: {len(response.history)} редиректов")
             
+            if self.username.lower() in response.text.lower():
+                print(f"✅ {self.username} найден в тексте - АВТОРИЗОВАН")
+            else:
+                print(f"❌ {self.username} НЕ найден в тексте - НЕ АВТОРИЗОВАН")
+                return False
+
             # Проверяем, не перенаправило ли снова на логин
             if '/login' in response.url:
                 print_and_log("❌ Steam снова перенаправил на страницу входа")
@@ -462,19 +408,19 @@ class PasswordChanger:
                 # Извлекаем параметры по образцу PasswordChangeParams
                 try:
                     self.recovery_params = {
-                        's': query_params.get('s', [None])[0],
-                        'account': query_params.get('account', [None])[0],
-                        'reset': query_params.get('reset', [None])[0],
-                        'issueid': query_params.get('issueid', [None])[0],
-                        'lost': query_params.get('lost', ['0'])[0]
+                        's': query_params.get('s', [None])[0],  # ID сессии восстановления
+                        'account': query_params.get('account', [None])[0],  # Имя аккаунта
+                        'reset': query_params.get('reset', [None])[0],  # Флаг сброса
+                        'issueid': query_params.get('issueid', [None])[0],  # ID проблемы
+                        'lost': query_params.get('lost', ['0'])[0]  # Флаг потерянного доступа
                     }
                     
                     print_and_log(f"🔍 Извлеченные параметры: {self.recovery_params}")
                     
                     # Проверяем, что все обязательные параметры есть
                     if all(v is not None for k, v in self.recovery_params.items() if k != 'lost'):
-                        session_id = self.recovery_params['s']
-                        print_and_log(f"✅ Процесс восстановления инициализирован. Session ID: {session_id}")
+                        recovery_id = self.recovery_params['s']
+                        print_and_log(f"✅ Процесс восстановления инициализирован. id восстановления: {recovery_id}")
                         return True
                     else:
                         print_and_log("❌ Не все обязательные параметры найдены в редиректе")
@@ -512,39 +458,34 @@ class PasswordChanger:
             return False
     
     def _goto_enter_code(self) -> bool:
-        """Переход к странице ввода кода с использованием извлеченных параметров"""
+        """
+        Переход к странице ввода кода с использованием извлеченных параметров.
+        
+        Returns:
+            bool: True если переход выполнен успешно
+        """
         try:
             print_and_log("🔍 Переход к странице ввода кода...")
             
             # Используем все параметры, полученные при инициализации
-            url = "https://help.steampowered.com/en/wizard/HelpWithLoginInfoEnterCode"
+            url = SteamUrls.ENTER_CODE
             params = {
-                's': self.recovery_params['s'],
-                'account': self.recovery_params['account'],
-                'reset': self.recovery_params['reset'],
-                'lost': self.recovery_params['lost'],
-                'issueid': self.recovery_params['issueid'],
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                'gamepad': '0'
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'account': self.recovery_params['account'],  # Имя аккаунта
+                'reset': self.recovery_params['reset'],  # Флаг сброса
+                'lost': self.recovery_params['lost'],  # Флаг потерянного доступа
+                'issueid': self.recovery_params['issueid'],  # ID проблемы
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                'gamepad': '0'  # Флаг геймпада
             }
             
             print_and_log(f"🔍 URL: {url}")
             print_and_log(f"🔍 Параметры: {params}")
             
             headers = {
-                'Accept': '*/*',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Connection': 'keep-alive',
-                'Referer': f"https://help.steampowered.com/en/wizard/HelpWithLoginInfoEnterCode?s={self.recovery_params['s']}&account={self.recovery_params['account']}&reset={self.recovery_params['reset']}&lost={self.recovery_params['lost']}&issueid={self.recovery_params['issueid']}",
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'User-Agent': self.BROWSER,
-                'X-Requested-With': 'XMLHttpRequest',
-                'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"'
+                **self.http_helper.get_ajax_headers(),
+                'Referer': self.http_helper.build_referer_url(url, self.recovery_params)
             }
             
             response = self.steam_client._session.get(url, params=params, headers=headers)
@@ -555,10 +496,6 @@ class PasswordChanger:
                 content = response.text
                 print_and_log(f"🔍 Длина содержимого: {len(content)}")
                 print_and_log(f"🔍 Первые 300 символов: {content[:300]}")
-                
-                if "error" in content.lower() or "ошибка" in content.lower():
-                    print_and_log("❌ Обнаружена ошибка в ответе")
-                    return False
                 
                 print_and_log("✅ Переход к вводу кода выполнен успешно")
                 return True
@@ -571,40 +508,34 @@ class PasswordChanger:
             return False
     
     def _send_recovery_request(self) -> bool:
-        """Отправка запроса на восстановление"""
+        """
+        Отправка запроса на восстановление пароля.
+        
+        Returns:
+            bool: True если запрос отправлен успешно
+        """
         try:
-            url = "https://help.steampowered.com/en/wizard/AjaxSendAccountRecoveryCode"
+            url = SteamUrls.SEND_RECOVERY_CODE
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                'gamepad': '0',
-                's': self.recovery_params['s'],
-                'method': '8',  # Мобильное подтверждение
-                'link': '',
-                'n': '1'
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                'gamepad': '0',  # Флаг геймпада
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'method': '8',  # Мобильное подтверждение Steam Guard
+                'link': '',  # Пустая ссылка
+                'n': '1'  # Количество кодов
             }
             
             headers = {
-                'Accept': '*/*',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Connection': 'keep-alive',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://help.steampowered.com',
-                'Referer': f"https://help.steampowered.com/en/wizard/HelpWithLoginInfoEnterCode?s={self.recovery_params['s']}&account={self.recovery_params['account']}&reset={self.recovery_params['reset']}&lost={self.recovery_params['lost']}&issueid={self.recovery_params['issueid']}",
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'User-Agent': self.BROWSER,
-                'X-Requested-With': 'XMLHttpRequest',
-                'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"'
+                **self.http_helper.get_form_headers(),
+                'Referer': self.http_helper.build_referer_url(SteamUrls.ENTER_CODE, self.recovery_params)
             }
             
             response = self.steam_client._session.post(url, data=data, headers=headers)
             if response.status_code == 200:
                 try:
                     result = response.json()
+                    logger.info(f"🔍 Результат отправки запроса: {result}")
                     if result.get('success'):
                         print_and_log("✅ Запрос на восстановление отправлен")
                         return True
@@ -623,51 +554,44 @@ class PasswordChanger:
             return False
     
     def _poll_confirmation(self) -> bool:
-        """Поллинг подтверждения"""
+        """
+        Поллинг подтверждения смены пароля.
+        
+        Returns:
+            bool: True если подтверждение получено
+        """
         try:
-            url = "https://help.steampowered.com/en/wizard/AjaxPollAccountRecoveryConfirmation"
+            url = SteamUrls.POLL_CONFIRMATION
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                'gamepad': '0',
-                's': self.recovery_params['s'],
-                'reset': self.recovery_params['reset'],
-                'lost': self.recovery_params['lost'],
-                'method': '8',
-                'issueid': self.recovery_params['issueid']
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                'gamepad': '0',  # Флаг геймпада
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'reset': self.recovery_params['reset'],  # Флаг сброса
+                'lost': self.recovery_params['lost'],  # Флаг потерянного доступа
+                'method': '8',  # Мобильное подтверждение Steam Guard
+                'issueid': self.recovery_params['issueid']  # ID проблемы
             }
             
             headers = {
-                'Accept': '*/*',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Connection': 'keep-alive',
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Origin': 'https://help.steampowered.com',
-                'Referer': f"https://help.steampowered.com/en/wizard/HelpWithLoginInfoEnterCode?s={self.recovery_params['s']}&account={self.recovery_params['account']}&reset={self.recovery_params['reset']}&lost={self.recovery_params['lost']}&issueid={self.recovery_params['issueid']}",
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'User-Agent': self.BROWSER,
-                'X-Requested-With': 'XMLHttpRequest',
-                'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"'
+                **self.http_helper.get_form_headers(),
+                'Referer': self.http_helper.build_referer_url(SteamUrls.ENTER_CODE, self.recovery_params)
             }
             
-            max_attempts = 60  # 60 попыток * 3 секунды = 3 минуты
-            for attempt in range(max_attempts):
-                print_and_log(f"⏳ Попытка {attempt + 1}/{max_attempts}")
+            for attempt in range(PasswordConstants.MAX_POLL_ATTEMPTS):
+                print_and_log(f"⏳ Попытка {attempt + 1}/{PasswordConstants.MAX_POLL_ATTEMPTS}")
                 
                 response = self.steam_client._session.post(url, data=data, headers=headers)
                 
                 if response.status_code == 200:
                     try:
                         result = response.json()
+                        logger.info(f"🔍 Результат поллинга подтверждения: {result}")
                         if not result.get('errorMsg'):
                             print_and_log("✅ Подтверждение получено!")
                             return True
                         elif 'ожидание' in result.get('errorMsg', '').lower():
-                            time.sleep(3)
+                            time.sleep(PasswordConstants.POLL_DELAY)
                             continue
                         else:
                             print_and_log(f"❌ Ошибка подтверждения: {result.get('errorMsg')}")
@@ -676,7 +600,7 @@ class PasswordChanger:
                         print_and_log("✅ Получен ответ (проверяем как успех)")
                         return True
                 
-                time.sleep(3)
+                time.sleep(PasswordConstants.POLL_DELAY)
             
             print_and_log("❌ Подтверждение не получено в течение 3 минут")
             return False
@@ -686,25 +610,31 @@ class PasswordChanger:
             return False
     
     def _verify_recovery_code(self) -> bool:
-        """Верификация кода восстановления"""
+        """
+        Верификация кода восстановления пароля.
+        
+        Returns:
+            bool: True если код верифицирован успешно
+        """
         try:
-            url = "https://help.steampowered.com/en/wizard/AjaxVerifyAccountRecoveryCode"
+            url = SteamUrls.VERIFY_RECOVERY_CODE
             params = {
-                'code': '',
-                's': self.recovery_params['s'],
-                'reset': self.recovery_params['reset'],
-                'lost': self.recovery_params['lost'],
-                'method': '8',
-                'issueid': self.recovery_params['issueid'],
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                'gamepad': '0'
+                'code': '',  # Пустой код (подтверждение уже получено)
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'reset': self.recovery_params['reset'],  # Флаг сброса
+                'lost': self.recovery_params['lost'],  # Флаг потерянного доступа
+                'method': '8',  # Мобильное подтверждение Steam Guard
+                'issueid': self.recovery_params['issueid'],  # ID проблемы
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                'gamepad': '0'  # Флаг геймпада
             }
             
             response = self.steam_client._session.get(url, params=params)
             if response.status_code == 200:
                 try:
                     result = response.json()
+                    logger.info(f"🔍 Результат верификации кода: {result}")
                     return not result.get('errorMsg')
                 except:
                     return True
@@ -716,16 +646,21 @@ class PasswordChanger:
             return False
     
     def _get_next_step(self) -> bool:
-        """Получение следующего шага"""
+        """
+        Получение следующего шага процесса восстановления.
+        
+        Returns:
+            bool: True если следующий шаг получен успешно
+        """
         try:
-            url = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryGetNextStep"
+            url = SteamUrls.GET_NEXT_STEP
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                's': self.recovery_params['s'],
-                'account': self.recovery_params['account'],
-                'reset': self.recovery_params['reset'],
-                'issueid': self.recovery_params['issueid'],
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'account': self.recovery_params['account'],  # Имя аккаунта
+                'reset': self.recovery_params['reset'],  # Флаг сброса
+                'issueid': self.recovery_params['issueid'],  # ID проблемы
                 'lost': '2'  # Переключаем на lost=2 для следующих шагов
             }
             
@@ -733,6 +668,7 @@ class PasswordChanger:
             if response.status_code == 200:
                 try:
                     result = response.json()
+                    logger.info(f"🔍 Результат получения шага: {result}")
                     return not result.get('errorMsg')
                 except:
                     return True
@@ -744,7 +680,12 @@ class PasswordChanger:
             return False
     
     def _verify_old_password(self) -> bool:
-        """Верификация старого пароля"""
+        """
+        Верификация текущего пароля аккаунта.
+        
+        Returns:
+            bool: True если пароль верифицирован успешно
+        """
         try:
             # Получаем текущий пароль
             account_config = self.account_context.config_manager.accounts_settings.get(self.username, {})
@@ -763,20 +704,21 @@ class PasswordChanger:
             if not encrypted_password:
                 return False
             
-            url = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryVerifyPassword/"
+            url = SteamUrls.VERIFY_PASSWORD
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                's': self.recovery_params['s'],
-                'lost': '2',
-                'reset': '1',
-                'password': encrypted_password,
-                'rsatimestamp': rsa_key['timestamp']
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'lost': '2',  # Флаг потерянного доступа
+                'reset': '1',  # Флаг сброса
+                'password': encrypted_password,  # Зашифрованный текущий пароль
+                'rsatimestamp': rsa_key['timestamp']  # Временная метка RSA ключа
             }
-            
+        
             response = self.steam_client._session.post(url, data=data)
             if response.status_code == 200:
                 try:
                     result = response.json()
+                    logger.info(f"🔍 Результат верификации пароля: {result}")
                     return not result.get('errorMsg')
                 except:
                     return True
@@ -788,7 +730,15 @@ class PasswordChanger:
             return False
     
     def _set_new_password(self, new_password: str) -> bool:
-        """Установка нового пароля"""
+        """
+        Установка нового пароля для аккаунта.
+        
+        Args:
+            new_password: Новый пароль для установки
+            
+        Returns:
+            bool: True если пароль установлен успешно
+        """
         try:
             # Проверяем доступность пароля
             if not self._check_password_available(new_password):
@@ -804,20 +754,21 @@ class PasswordChanger:
             if not encrypted_password:
                 return False
             
-            url = "https://help.steampowered.com/en/wizard/AjaxAccountRecoveryChangePassword/"
+            url = SteamUrls.CHANGE_PASSWORD
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                's': self.recovery_params['s'],
-                'account': self.recovery_params['account'],
-                'password': encrypted_password,
-                'rsatimestamp': rsa_key['timestamp']
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                's': self.recovery_params['s'],  # ID сессии восстановления
+                'account': self.recovery_params['account'],  # Имя аккаунта
+                'password': encrypted_password,  # Зашифрованный новый пароль
+                'rsatimestamp': rsa_key['timestamp']  # Временная метка RSA ключа
             }
             
             response = self.steam_client._session.post(url, data=data)
             if response.status_code == 200:
                 try:
                     result = response.json()
+                    logger.info(f"🔍 Результат установки пароля: {result}")
                     if not result.get('errorMsg'):
                         print_and_log("✅ Новый пароль установлен")
                         return True
@@ -835,12 +786,17 @@ class PasswordChanger:
             return False
     
     def _get_rsa_key(self) -> Optional[Dict[str, str]]:
-        """Получение RSA ключа для шифрования"""
+        """
+        Получение RSA ключа для шифрования пароля.
+        
+        Returns:
+            Optional[Dict[str, str]]: RSA ключ или None при ошибке
+        """
         try:
-            url = "https://help.steampowered.com/en/login/getrsakey/"
+            url = SteamUrls.GET_RSA_KEY
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'username': self.username
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'username': self.username  # Имя пользователя
             }
             
             response = self.steam_client._session.post(url, data=data)
@@ -860,7 +816,16 @@ class PasswordChanger:
             return None
     
     def _encrypt_password(self, password: str, rsa_key: Dict[str, str]) -> str:
-        """Шифрование пароля с помощью RSA"""
+        """
+        Шифрование пароля с помощью RSA.
+        
+        Args:
+            password: Пароль для шифрования
+            rsa_key: RSA ключ для шифрования
+            
+        Returns:
+            str: Зашифрованный пароль в base64 или пустая строка при ошибке
+        """
         try:
             import rsa
             
@@ -869,11 +834,11 @@ class PasswordChanger:
             public_key = rsa.PublicKey(n=publickey_mod, e=publickey_exp)
             
             encrypted_password = rsa.encrypt(
-                message=password.encode('ascii'),
+                message=password.encode(PasswordConstants.RSA_ENCODING),
                 pub_key=public_key,
             )
             encrypted_password64 = base64.b64encode(encrypted_password)
-            return str(encrypted_password64, 'utf8')
+            return str(encrypted_password64, PasswordConstants.RSA_ENCODING_UTF8)
             
         except ImportError:
             print_and_log("❌ Библиотека rsa не установлена", "ERROR")
@@ -884,18 +849,27 @@ class PasswordChanger:
             return ""
     
     def _check_password_available(self, password: str) -> bool:
-        """Проверка доступности пароля"""
+        """
+        Проверка доступности пароля для использования.
+        
+        Args:
+            password: Пароль для проверки
+            
+        Returns:
+            bool: True если пароль доступен для использования
+        """
         try:
-            url = "https://help.steampowered.com/en/wizard/AjaxCheckPasswordAvailable/"
+            url = SteamUrls.CHECK_PASSWORD_AVAILABLE
             data = {
-                'sessionid': self.steam_client._get_session_id(),
-                'wizard_ajax': '1',
-                'password': password
+                'sessionid': self.steam_client._get_session_id(),  # ID сессии Steam
+                'wizard_ajax': '1',  # Флаг AJAX запроса
+                'password': password  # Пароль для проверки
             }
             
             response = self.steam_client._session.post(url, data=data)
             if response.status_code == 200:
                 result = response.json()
+                logger.info(f"🔍 Результат проверки доступности пароля: {result}")
                 if result.get('available'):
                     print_and_log("✅ Пароль доступен")
                     return True
@@ -910,18 +884,23 @@ class PasswordChanger:
             return False
     
     def _update_configuration(self, new_password: str) -> bool:
-        """Обновление конфигурации с новым паролем"""
+        """
+        Обновление конфигурации с новым паролем.
+        
+        Args:
+            new_password: Новый пароль для сохранения
+            
+        Returns:
+            bool: True если конфигурация обновлена успешно
+        """
         try:
             print_and_log("💾 Обновляем конфигурацию...")
             
             # Получаем config_manager из контекста
-            config_manager = self.account_context.config_manager
+            cookie_manager = self.account_context.cookie_manager
             
             # Обновляем пароль в конфигурации
-            config_manager.set('password', new_password)
-            
-            # Сохраняем конфигурацию
-            config_manager.save_config()
+            cookie_manager.password = new_password
             
             print_and_log("✅ Конфигурация обновлена")
             return True
@@ -932,7 +911,12 @@ class PasswordChanger:
 
     # Остальные методы из вашего оригинального кода
     def _get_new_password(self) -> Optional[str]:
-        """Получение нового пароля"""
+        """
+        Интерактивное получение нового пароля от пользователя.
+        
+        Returns:
+            Optional[str]: Новый пароль или None при отмене
+        """
         print_and_log("")
         print_and_log("📝 Введите новый пароль:")
         print_and_log("💡 Требования к паролю:")
@@ -949,7 +933,7 @@ class PasswordChanger:
                 continue
             
             # Проверяем надежность пароля
-            validation: Dict[str, Union[bool, int, list]] = self._validate_password(new_password)
+            validation: Dict[str, Union[bool, int, List[str]]] = self.validate_password_strength(new_password)
             if not validation['is_valid']:
                 print_and_log("❌ Пароль не соответствует требованиям:")
                 for issue in validation['issues']:
@@ -974,7 +958,12 @@ class PasswordChanger:
             return new_password
     
     def _confirm_password_change(self) -> bool:
-        """Подтверждение смены пароля"""
+        """
+        Интерактивное подтверждение смены пароля.
+        
+        Returns:
+            bool: True если пользователь подтвердил смену пароля
+        """
         print_and_log("")
         print_and_log("⚠️  ВНИМАНИЕ:")
         print_and_log("  • Смена пароля может затронуть работу бота")
@@ -992,8 +981,13 @@ class PasswordChanger:
             else:
                 print_and_log("❌ Введите 'y' для продолжения или 'n' для отмены", "ERROR")
     
-    def _verify_current_password(self, password: str) -> bool:
-        """Проверка текущего пароля"""
+    def _verify_current_session(self) -> bool:
+        """
+        Проверка активности текущей сессии Steam.
+        
+        Returns:
+            bool: True если сессия активна
+        """
         try:
             print_and_log("🔍 Проверяем активность сессии...")
             
@@ -1006,7 +1000,7 @@ class PasswordChanger:
                     return False
             else:
                 # Альтернативная проверка через тестовый запрос
-                test_url = "https://store.steampowered.com/en/account/"
+                test_url = SteamUrls.ACCOUNT_TEST
                 test_response = self.steam_client._session.get(test_url)
                 if test_response.status_code == 200 and "account" in test_response.text.lower():
                     print_and_log("✅ Сессия активна (по тесту)")
@@ -1020,7 +1014,12 @@ class PasswordChanger:
             return False
     
     def _verify_steam_guard_data(self) -> bool:
-        """Проверка наличия данных Steam Guard"""
+        """
+        Проверка наличия данных Steam Guard для мобильного подтверждения.
+        
+        Returns:
+            bool: True если данные Steam Guard доступны
+        """
         try:
             print_and_log("🔍 Проверяем данные Steam Guard...")
             
@@ -1047,16 +1046,27 @@ class PasswordChanger:
             print_and_log(f"❌ Ошибка проверки Steam Guard данных: {e}", "ERROR")
             return False
     
-    def _validate_password(self, password: str) -> Dict[str, Union[bool, int, list]]:
-        """Проверка надежности пароля"""
-        result: Dict[str, Union[bool, int, list]] = {
+    def validate_password_strength(self, password: str) -> Dict[str, Union[bool, int, List[str]]]:
+        """
+        Проверка надежности пароля.
+        
+        Args:
+            password: Пароль для проверки
+            
+        Returns:
+            Dict с результатами проверки:
+            - is_valid: bool - соответствует ли пароль требованиям
+            - score: int - оценка надежности (0-6)
+            - issues: List[str] - список проблем с паролем
+        """
+        result: Dict[str, Union[bool, int, List[str]]] = {
             'is_valid': True,
             'score': 0,
             'issues': []
         }
         
         # Минимальная длина
-        if len(password) < 8:
+        if len(password) < PasswordConstants.MIN_PASSWORD_LENGTH:
             result['issues'].append("Пароль должен содержать минимум 8 символов")
             result['is_valid'] = False
         
@@ -1069,11 +1079,11 @@ class PasswordChanger:
         if not any(c.isdigit() for c in password):
             result['issues'].append("Пароль должен содержать цифры")
             result['is_valid'] = False
-
+        
         # Подсчет очков надежности
-        if len(password) >= 12:
+        if len(password) >= PasswordConstants.STRONG_PASSWORD_LENGTH:
             result['score'] += 2
-        elif len(password) >= 8:
+        elif len(password) >= PasswordConstants.MIN_PASSWORD_LENGTH:
             result['score'] += 1
             
         if any(c.isupper() for c in password):
@@ -1082,7 +1092,7 @@ class PasswordChanger:
         if any(c.islower() for c in password):
             result['score'] += 1
             
-        if any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password):
+        if any(c in PasswordConstants.SPECIAL_CHARS for c in password):
             result['score'] += 2
             
         return result

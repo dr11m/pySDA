@@ -228,7 +228,7 @@ class CookieManager:
             Dict[str, str] или None: Актуальные cookies
         """
         try:
-            # Проверяем актуальность cookies
+            # Если не требуется принудительное обновление и cookies ещё действительны — просто возвращаем их, не обновляем
             if not force and self.is_cookies_valid():
                 logger.info("✅ Cookies актуальны, обновление не требуется")
                 return self.cookies_cache or self.storage.load_cookies(self.username)
@@ -239,6 +239,16 @@ class CookieManager:
             if not self.steam_client:
                 self.steam_client = self._create_steam_client()
             
+            if not force:
+                print_and_log(f"🔄 Проверяем активность сессии для {self.username}, если она активна, то обновление не требуется")
+                is_username_exist =self.steam_client.check_session_static(self.username, self.steam_client._session)
+                if is_username_exist is True:
+                    #обновляем время
+                    self.last_update = datetime.now()
+                    self.cookies_cache = self.storage.load_cookies(self.username)
+                    self.storage.save_cookies(self.username, self.cookies_cache)
+                    return self.cookies_cache
+
             self.steam_client.update_session()
             
             # Получаем cookies из сессии
