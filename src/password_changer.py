@@ -18,15 +18,15 @@ import time
 import urllib.parse
 import re
 from typing import Optional, Dict, Any, Union, List
-from .constants import Messages
-from .display_formatter import DisplayFormatter
-from src.utils.logger_setup import print_and_log
-from src.utils.cookies_and_session import session_to_dict, extract_cookies_for_domain
-from src.cli.account_context import AccountContext
-from src.steampy.client import SteamClient
-from src.steampy.confirmation import ConfirmationExecutor, Confirmation
+from .cli.constants import Messages
+from .cli.display_formatter import DisplayFormatter
+from .utils.logger_setup import print_and_log
+from .utils.cookies_and_session import session_to_dict, extract_cookies_for_domain
+from .cli.account_context import AccountContext
+from .steampy.client import SteamClient
+from .steampy.confirmation import ConfirmationExecutor, Confirmation
 
-from src.utils.logger_setup import logger
+from .utils.logger_setup import logger
 
 
 # Константы для улучшения читаемости

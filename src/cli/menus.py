@@ -13,12 +13,12 @@ from .trade_handlers import (
     SpecificTradeHandler,
     TradeCheckHandler
 )
-from src.models import TradeOffer
+from ..models import TradeOffer
 from .settings_manager import SettingsManager
 from .auto_manager import AutoManager, AutoSettings
 from .market_handler import MarketHandler
-from .password_changer import PasswordChanger
-from src.utils.logger_setup import print_and_log
+from ..password_changer import PasswordChanger
+from ..utils.logger_setup import print_and_log
 from pathlib import Path
 import json
 import requests
