@@ -145,32 +145,48 @@ class LoginExecutor:
 
     def get_web_cookies(self, refresh_token: str, steam_id: str) -> List[str]:
         """
-        Получение web cookies для Steam сайтов.
+        Получение web cookies для Steam сайтов и обновление текущей сессии.
         
         Точный аналог getWebCookies() из node-steam-session.
         Оригинальный код: https://github.com/DoctorMcKay/node-steam-session/blob/master/src/LoginSession.ts#L1050-L1150
         
-        Выполняет полный цикл аутентификации для получения cookies всех Steam доменов:
-        1. Генерирует уникальный session_id (12 байт hex)
-        2. Делает запрос к /jwt/finalizelogin для получения transfer_info
-        3. Извлекает первичные cookies из ответа finalizelogin  
-        4. Обрабатывает все transfer_info URLs для получения domain-specific cookies
-        5. Фильтрует и добавляет sessionid cookies для всех доменов
+        Выполняет полный цикл аутентификации WebBrowser платформы:
+        1. Генерирует уникальный session_id (12 байт hex) как randomBytes(12).toString('hex')
+        2. POST к /jwt/finalizelogin с refresh_token для получения transfer_info массива
+        3. Извлекает базовые cookies из Set-Cookie заголовков ответа finalizelogin
+        4. Обрабатывает все transfer_info URLs (community, store, help, checkout) с retry логикой
+        5. Проверяет rtExpiry для контроля срока действия refresh токена
+        6. Обновляет self.session.cookies с едиными sessionid для всех Steam доменов
         
         Args:
-            refresh_token (str): JWT refresh token для аутентификации в Steam
-            steam_id (str): Steam ID пользователя (извлекается из токена)
+            refresh_token (str): JWT refresh token для аутентификации Steam WebAPI.
+                            Формат: "eyJ..." с полями iss, sub, aud, exp, iat
+            steam_id (str): Steam ID пользователя в формате "76561198XXXXXXXXX".
+                        Используется в transfer requests как steamID параметр
             
         Returns:
-            List[str]: Список cookie-строк в формате "name=value; Domain=domain; Path=/; Secure"
-                    Включает steamLoginSecure и sessionid для всех Steam доменов
+            List[str]: Список cookie-строк в формате "name=value; Domain=domain; атрибуты".
+                    Включает steamLoginSecure, steamRefresh_steam, steamCountry для каждого домена.
+                    НЕ включает sessionid cookies (они добавляются прямо в self.session)
                     
         Raises:
-            Exception: При ошибках HTTP запросов, невалидных ответах Steam или отсутствии cookies
+            Exception: HTTP ошибки (статус != 200) при запросах к Steam API
+            Exception: Невалидный JSON ответ от /jwt/finalizelogin
+            Exception: Steam API ошибки в поле 'error' ответа finalizelogin
+            Exception: Отсутствие transfer_info массива в ответе
+            Exception: Истекший refresh токен (rtExpiry <= current_timestamp)
+            Exception: Отсутствие обязательных Set-Cookie заголовков в transfer ответах
+            Exception: Отсутствие steamLoginSecure cookie в transfer ответах
+            
+        Side Effects:
+            - Обновляет self.session.cookies с новыми Steam cookies
+            - Заменяет все sessionid cookies единым сгенерированным значением
+            - Логирует прогресс и ошибки в stdout
             
         Note:
-            Метод работает только с WebBrowser платформой. Для MobileApp/SteamClient 
-            используется другая логика через access_token.
+            Метод изменяет состояние self.session - после выполнения сессия готова
+            для аутентифицированных запросов ко всем Steam веб-сервисам.
+            Работает только для WebBrowser платформы (не MobileApp/SteamClient).
         """
         
         # Генерируем sessionId как в оригинале (randomBytes(12).toString('hex'))
@@ -188,7 +204,41 @@ class LoginExecutor:
         return cookies
 
     def _make_finalize_request(self, session_id: str, refresh_token: str) -> tuple:
-        """Делает запрос к jwt/finalizelogin"""
+        """
+        Инициирует процесс получения web cookies через Steam JWT finalizelogin endpoint.
+        
+        Отправляет POST запрос к /jwt/finalizelogin с refresh_token для получения 
+        transfer_info - массива URL'ов для получения domain-specific cookies.
+        Имитирует браузерный запрос с соответствующими Origin/Referer заголовками.
+        
+        Args:
+            session_id (str): Сгенерированный session ID (12 байт hex). 
+                            Используется Steam для связывания всех последующих requests
+            refresh_token (str): JWT refresh token для аутентификации.
+                            Передается как 'nonce' параметр в request body
+            
+        Returns:
+            tuple[requests.Response, dict]: Кортеж из:
+                - finalize_response: HTTP response объект с Set-Cookie заголовками
+                - json_body: Распарсенный JSON с обязательным полем 'transfer_info'
+                
+        Raises:
+            Exception: HTTP статус != 200 при запросе к finalizelogin
+            Exception: Невалидный JSON в ответе (не парсится)
+            Exception: Поле 'error' присутствует в JSON ответе 
+            Exception: Отсутствие обязательного поля 'transfer_info' в ответе
+            
+        Request Details:
+            URL: https://login.steampowered.com/jwt/finalizelogin
+            Method: POST
+            Headers: Origin/Referer: steamcommunity.com (для обхода CORS)
+            Body: nonce={refresh_token}, sessionid={session_id}, redir=login_home_url
+            
+        Note:
+            Этот запрос критически важен - без transfer_info невозможно получить
+            cookies для отдельных Steam доменов. Steam возвращает массив объектов
+            вида {url: "https://domain.com/login/settoken", params: {...}}.
+        """
         body = {
             'nonce': refresh_token,
             'sessionid': session_id,
@@ -224,7 +274,36 @@ class LoginExecutor:
         return finalize_response, json_body
 
     def _extract_initial_cookies(self, finalize_response) -> List[str]:
-        """Извлекает cookies из finalize response - ТОЧНО КАК В ОРИГИНАЛЕ"""
+        """
+        Извлекает базовые cookies из Set-Cookie заголовков ответа finalizelogin.
+        
+        Парсит Set-Cookie заголовки и нормализует cookies добавлением Domain атрибутов
+        там где они отсутствуют. Эти cookies содержат базовую аутентификационную 
+        информацию необходимую для успешной обработки transfer_info URLs.
+        
+        Args:
+            finalize_response (requests.Response): HTTP ответ от /jwt/finalizelogin
+                                                с Set-Cookie заголовками
+            
+        Returns:
+            List[str]: Список нормализованных cookie-строк с Domain атрибутами.
+                    Каждая строка в формате "name=value; Domain=domain; атрибуты"
+            
+        Algorithm:
+            1. Извлекает домен из finalize_response.url
+            2. Парсит set-cookie заголовок разделяя по запятым  
+            3. Для каждой cookie проверяет наличие Domain= атрибута
+            4. Добавляет "; Domain={domain}" если атрибут отсутствует
+            5. Возвращает список нормализованных cookie строк
+            
+        Note:
+            Этот этап критически важен - cookies из finalizelogin предоставляют
+            аутентификационный контекст для transfer requests. Без них Steam
+            будет отклонять последующие запросы с HTTP 401/403 ошибками.
+            
+            Метод точно воспроизводит логику оригинального TypeScript кода
+            включая проверку cookie.lower().find('domain=') >= 0.
+        """
         domain = urlparse(finalize_response.url).netloc
         cookies: List[str] = []
         
@@ -239,14 +318,101 @@ class LoginExecutor:
         return cookies
 
     def _process_transfer_info(self, steam_id: str, json_body: Dict[str, Any], cookies: List[str]) -> List[str]:
-        """Обрабатывает все transfer_info URLs"""
+        """
+        Обрабатывает массив transfer_info URLs для получения domain-specific cookies.
+        
+        Итерирует по всем объектам transfer_info из ответа finalizelogin и делегирует
+        обработку каждого URL методу _process_single_transfer. Собирает cookies
+        со всех Steam доменов: community, store, help, checkout, steam.tv и других.
+        
+        Args:
+            steam_id (str): Steam ID пользователя для включения в transfer requests.
+                        Добавляется как 'steamID' параметр в POST body каждого запроса
+            json_body (dict): JSON ответ от finalizelogin содержащий transfer_info массив.
+                            Каждый элемент: {url: str, params: dict}
+            cookies (List[str]): Текущий список cookies для пополнения новыми cookies
+            
+        Returns:
+            List[str]: Обогащенный список cookies с добавленными domain-specific cookies
+                    от всех обработанных transfer URLs
+                    
+        Transfer Info Structure:
+            [
+                {
+                    "url": "https://steamcommunity.com/login/settoken",
+                    "params": {"nonce": "...", "auth": "..."}
+                },
+                {
+                    "url": "https://store.steampowered.com/login/settoken", 
+                    "params": {"nonce": "...", "auth": "..."}
+                }
+                // ... другие домены
+            ]
+            
+        Note:
+            Каждый transfer URL соответствует отдельному Steam домену/сервису.
+            Успешная обработка ВСЕХ URLs необходима для получения полного набора
+            web cookies и корректной работы со всеми Steam веб-интерфейсами.
+            
+            Метод не прерывается при ошибке одного URL - продолжает обработку
+            остальных (ошибки обрабатываются в _process_single_transfer).
+        """
         for transfer in json_body['transfer_info']:
             cookies = self._process_single_transfer(transfer, steam_id, cookies)
         
         return cookies
 
     def _process_single_transfer(self, transfer: Dict[str, Any], steam_id: str, cookies: List[str]) -> List[str]:
-        """Обрабатывает один transfer URL"""
+        """
+        Обрабатывает один transfer URL с retry логикой, валидацией и извлечением cookies.
+        
+        Выполняет POST запрос к конкретному Steam domain endpoint (settoken) с
+        механизмом повторных попыток до 5 раз. Валидирует JSON ответ, проверяет
+        срок действия refresh токена через rtExpiry, и извлекает steamLoginSecure 
+        cookies из Set-Cookie заголовков.
+        
+        Args:
+            transfer (dict): Объект transfer от Steam API с ключами:
+                            - 'url': endpoint URL для получения cookies
+                            - 'params': дополнительные параметры для request body
+            steam_id (str): Steam ID для добавления как 'steamID' в request body
+            cookies (List[str]): Текущий список cookies для пополнения
+            
+        Returns:
+            List[str]: Обновленный список cookies с добавленными domain cookies
+                    от успешно обработанного transfer URL
+                    
+        Raises:
+            Exception: Все 5 попыток исчерпаны без успешного результата
+            Exception: HTTP статус >= 400 в ответе от transfer URL
+            Exception: Steam API ошибка в JSON поле 'result' != TransferResult.OK
+            Exception: Refresh токен истек (rtExpiry <= current_timestamp) 
+            Exception: Отсутствие Set-Cookie заголовка в ответе
+            Exception: Отсутствие обязательной steamLoginSecure cookie
+            
+        Retry Logic:
+            - Максимум 5 попыток для каждого URL (ATTEMPT_COUNT = 5)
+            - При неудаче логирует ошибку и повторяет без задержки
+            - При финальной неудаче выбрасывает исключение с детальным описанием
+            - При успехе немедленно выходит из retry цикла
+            
+        Validation Steps:
+            1. HTTP статус < 400
+            2. JSON парсинг и проверка result поля
+            3. Проверка rtExpiry против current timestamp
+            4. Наличие Set-Cookie заголовка
+            5. Наличие steamLoginSecure в cookies
+            
+        Cookie Processing:
+            - Парсит Set-Cookie заголовок разделяя по запятым
+            - Добавляет Domain атрибут если отсутствует
+            - Добавляет все cookies к общему списку
+            
+        Note:
+            Этот метод реализует критичную retry логику как в оригинальном
+            node-steam-session. Steam API может временно возвращать ошибки,
+            поэтому повторные попытки существенно повышают надежность.
+        """
         url = transfer['url']
         params = transfer.get('params', {})
         
@@ -310,7 +476,47 @@ class LoginExecutor:
 
     def _filter_and_add_session_cookies(self, session_id: str) -> None:
         """
-        Заменяет sessionid для каждого домена на сгенерированный.
+        Заменяет sessionid cookies в self.session.cookies единым сгенерированным значением.
+        
+        Реализует финальную логику оригинального node-steam-session: удаляет все
+        существующие sessionid cookies из сессии и устанавливает один и тот же
+        сгенерированный session_id для каждого Steam домена. Это обеспечивает
+        единообразную web сессию на всех Steam сайтах.
+        
+        Args:
+            session_id (str): Сгенерированный session ID (12 байт hex) для установки
+                            во все Steam домены. Тот же ID что используется в /jwt/finalizelogin
+            
+        Side Effects:
+            Модифицирует self.session.cookies:
+            - Удаляет все существующие sessionid cookies для Steam доменов
+            - Добавляет новые sessionid cookies с едиными значениями
+            - Устанавливает атрибуты: Path=/; Secure=True для каждого домена
+            
+        Algorithm (соответствует JS коду):
+            1. Сканирует self.session.cookies для извлечения уникальных доменов  
+            2. Исключает служебный домен 'login.steampowered.com'
+            3. Удаляет все sessionid cookies с правильными domain/path параметрами
+            4. Устанавливает новый sessionid для каждого домена через session.cookies.set()
+            
+        Processed Domains (обычно):
+            - steamcommunity.com (форумы, профили, группы)
+            - store.steampowered.com (магазин игр)  
+            - help.steampowered.com (поддержка)
+            - checkout.steampowered.com (покупки)
+            - steam.tv (трансляции)
+            
+        Error Handling:
+            - Перехватывает исключения при удалении cookies (может не существовать)
+            - Логирует предупреждения но продолжает обработку
+            - Гарантирует установку новых sessionid даже при ошибках удаления
+            
+        Note:
+            Этот метод критически важен для корректной работы Steam web сессии.
+            Единый sessionid на всех доменах позволяет пользователю беспрепятственно
+            переходить между Steam сайтами без повторной аутентификации.
+            
+            Соответствует JS коду: cookies.filter() + forEach(domain => cookies.push())
         """
         
         # 1. Собираем все домены и существующие sessionid cookies

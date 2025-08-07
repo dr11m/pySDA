@@ -11,12 +11,12 @@ from bs4 import BeautifulSoup
 from src.utils.logger_setup import logger, print_and_log
 from .constants import Messages
 from .display_formatter import DisplayFormatter
-
+from src.trade_confirmation_manager import TradeConfirmationManager
 
 class MarketHandler:
     """Обработчик подтверждения market ордеров"""
     
-    def __init__(self, trade_manager, formatter: DisplayFormatter, cookie_checker):
+    def __init__(self, trade_manager: TradeConfirmationManager, formatter: DisplayFormatter, cookie_checker):
         self.trade_manager = trade_manager
         self.formatter = formatter
         self.cookie_checker = cookie_checker
