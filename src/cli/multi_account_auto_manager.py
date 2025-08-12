@@ -3,7 +3,7 @@
 Менеджер для запуска автоматизации в едином цикле для всех аккаунтов.
 """
 import time
-from typing import Dict, Set, Any
+from typing import Dict, Set, Any, Optional, List
 
 from src.cli.account_context import build_account_context
 from src.cli.auto_manager import AutoManager
@@ -88,10 +88,11 @@ class AccountErrorTracker:
         }
 
 class MultiAccountAutoManager:
-    def __init__(self, config_manager: ConfigManager):
+    def __init__(self, config_manager: ConfigManager, allowed_account_names: Optional[List[str]] = None):
         # Используем клон ConfigManager для избежания конфликтов состояний
         self.config_manager = config_manager.clone()
         self._last_check_times: Dict[str, float] = {}
+        self.allowed_account_names: Optional[List[str]] = allowed_account_names
         
         # Получаем задержку из конфига и переводим в секунды
         delay_ms = self.config_manager.get('min_request_delay_ms', 1000)
@@ -113,7 +114,11 @@ class MultiAccountAutoManager:
 
     def start(self):
         """Запускает блокирующий единый цикл автоматизации для всех аккаунтов."""
-        account_names = self.config_manager.get_all_account_names()
+        account_names = (
+            list(self.allowed_account_names)
+            if self.allowed_account_names is not None
+            else self.config_manager.get_all_account_names()
+        )
         if not account_names:
             print_and_log("❌ Не найдено ни одного аккаунта для запуска автоматизации.")
             return

@@ -60,6 +60,10 @@ class CookieManager:
             storage=storage
         )
 
+        # Если указано отсутствие прокси, гарантируем прямое соединение для сессии
+        if proxy is None and hasattr(self.client, "_session"):
+            self._enforce_direct_connection(self.client._session)
+
         # И здесь же монтируем адаптер, если это необходимо
         if request_delay_sec > 0:
             adapter = DelayedHTTPAdapter(delay=request_delay_sec)
@@ -98,6 +102,11 @@ class CookieManager:
                 storage=self.storage
             )
             
+            # Если прокси нет — принудительно прямое соединение (без ENV и старых прокси)
+            if self.proxy is None and hasattr(steam_client, "_session"):
+                self._enforce_direct_connection(steam_client._session)
+
+
             # Устанавливаем HTTP адаптер с задержкой если она настроена
             if hasattr(self, 'request_delay_sec') and self.request_delay_sec > 0:
                 adapter = DelayedHTTPAdapter(delay=self.request_delay_sec)
@@ -110,6 +119,13 @@ class CookieManager:
         except Exception as e:
             logger.error(f"❌ Ошибка создания Steam клиента: {e}")
             return None
+
+    def _enforce_direct_connection(self, session) -> None:
+        """Отключает любые прокси и ENV-прокси для переданной сессии requests."""
+        if hasattr(session, "trust_env"):  # Страхуем себя от системных прокси
+            session.trust_env = False
+        if hasattr(session, "proxies") and isinstance(session.proxies, dict):
+            session.proxies.clear()
     
     def _is_session_alive(self) -> bool:
         """Проверка актуальности текущей сессии"""

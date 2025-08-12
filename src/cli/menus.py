@@ -867,7 +867,9 @@ class AutoMenu(NavigableMenu):
             
             # Всегда запускаем глобальную автоматизацию через MultiAccountAutoManager
             from src.cli.multi_account_auto_manager import MultiAccountAutoManager
-            multi_manager = MultiAccountAutoManager(self.cli.config_manager)
+            # Список аккаунтов берём из предпросмотра (только подтверждённые пользователем)
+            allowed_account_names = [acc['name'] for acc in accounts_with_automation]
+            multi_manager = MultiAccountAutoManager(self.cli.config_manager, allowed_account_names=allowed_account_names)
             
             # Запускаем блокирующий цикл автоматизации
             multi_manager.start()
