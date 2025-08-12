@@ -313,15 +313,21 @@ class AccountActionsMenu(NavigableMenu):
             print_and_log("❌ Не удалось получить список трейдов", "ERROR")
             return
         
-        # Фильтруем активные трейды для проверки
+        # Фильтруем активные и требующие подтверждения трейды
         active_trades = [t for t in all_trades if t.is_active]
+        confirmation_needed = [t for t in all_trades if t.needs_confirmation]
         
-        if not active_trades:
-            print_and_log("ℹ️  Нет активных трейдов для управления", "INFO")
+        # Если вообще ничего нет для управления
+        if not active_trades and not confirmation_needed:
+            print_and_log("ℹ️  Нет активных трейдов и нет трейдов, требующих подтверждения", "INFO")
             input("Нажмите Enter для продолжения...")
             return
         
-        # Если есть трейды, открываем меню управления, передавая уже полученные данные
+        # Если активных нет, но есть требующие подтверждения — всё равно открываем меню
+        if not active_trades and confirmation_needed:
+            print_and_log(f"ℹ️  Нет активных трейдов. Требующих подтверждения: {len(confirmation_needed)}")
+        
+        # Открываем меню управления, передавая уже полученные данные
         trades_menu = TradesMenu(self.cli, all_trades)
         trades_menu.run()
     
