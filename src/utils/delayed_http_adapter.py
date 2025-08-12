@@ -23,6 +23,10 @@ class DelayedHTTPAdapter(HTTPAdapter):
         Отправляет запрос и затем выполняет задержку.
         """
         try:
+            # Гарантируем разумные таймауты, если не переданы извне
+            if 'timeout' not in kwargs or kwargs['timeout'] is None:
+                # (connect_timeout, read_timeout)
+                kwargs['timeout'] = (10, 30)
             # Выполняем оригинальный запрос, вызывая метод родительского класса
             response = super().send(request, **kwargs)
             return response

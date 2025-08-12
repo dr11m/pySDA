@@ -74,7 +74,6 @@ class TradeCache:
         self.timestamp = 0
 
 
-
 class AutoManager:
     """Управляет автоматизацией и ее настройками."""
     
