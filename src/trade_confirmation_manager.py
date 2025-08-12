@@ -588,17 +588,6 @@ class TradeConfirmationManager:
             logger.debug(traceback.format_exc())
             return False
     
-    def confirm_trade_offer(self, trade_offer_id: str) -> bool:
-        """
-        Подтверждение трейд оффера через мобильный аутентификатор
-        (устаревший метод - используйте confirm_accepted_trade_offer для уже принятых трейдов)
-        """
-        logger.warning(f"⚠️ Используется устаревший метод confirm_trade_offer для {trade_offer_id}")
-        logger.info(f"ℹ️ Рекомендуется использовать confirm_accepted_trade_offer для уже принятых трейдов")
-        
-        # Перенаправляем на новый метод
-        return self.confirm_accepted_trade_offer(trade_offer_id)
-    
     def process_free_trades(self, auto_accept: bool = True, auto_confirm: bool = True) -> Dict[str, int]:
         """
         Обработка бесплатных входящих трейдов (подарков)
@@ -740,7 +729,7 @@ class TradeConfirmationManager:
                     
                     if auto_confirm:
                         # Подтверждаем трейд через Guard
-                        if self.confirm_trade_offer(offer.tradeofferid):
+                        if self.confirm_accepted_trade_offer(offer.tradeofferid):
                             stats['confirmed_trades'] += 1
                             logger.info(f"✅ Подтвержден трейд: {offer.tradeofferid}")
                         else:
