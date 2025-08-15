@@ -2,20 +2,22 @@
 """
 Утилиты для работы с IP адресами
 """
-import requests
-from requests import Session
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import print_and_log
 
-def check_ip(session: Session) -> None:
+
+def check_ip(original_get_method) -> None:
     """
-    Проверяет и выводит в лог IP-адрес, используя предоставленную сессию.
+    Проверяет и выводит в лог IP-адрес, используя оригинальный метод get сессии.
+    
+    Args:
+        original_get_method: Оригинальный метод get сессии (не переопределенный)
     """
     try:
-        response = session.get("https://api.ipify.org?format=json", timeout=10)
+        response = original_get_method("https://api.ipify.org?format=json", timeout=5)
         if response.status_code == 200:
             ip = response.json().get('ip', 'N/A')
-            logger.info(f"💡 IP check: {ip}")
+            print_and_log(f"💡 IP check: {ip}")
         else:
-            logger.warning(f"⚠️ IP check failed with status code: {response.status_code}")
-    except requests.RequestException as e:
-        logger.error(f"❌ IP check request failed: {e}")
+            print_and_log(f"⚠️ IP check failed with status code: {response.status_code}")
+    except Exception as e:
+        print_and_log(f"❌ IP check request failed: {e}")
