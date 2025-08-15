@@ -16,7 +16,7 @@ class CookieChecker:
         self.cookie_manager = cookie_manager
         self.formatter = formatter
     
-    def ensure_valid_cookies(self, max_age_minutes: int = 120, show_info: bool = True) -> bool:
+    def ensure_valid_cookies(self, max_age_minutes: int = 1000, show_info: bool = True) -> bool:
         """
         Убедиться, что cookies актуальны, обновить при необходимости
         
