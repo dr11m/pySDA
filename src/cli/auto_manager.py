@@ -16,9 +16,8 @@ from dataclasses import dataclass, asdict
 from src.utils.logger_setup import logger, print_and_log
 from .constants import Messages, AutoMenuChoice
 from .display_formatter import DisplayFormatter
-from src.cli.constants import MenuChoice
-from src.cli.menu_base import BaseMenu, NavigableMenu, MenuItem
-from src.steampy.confirmation import Confirmation
+from src.cli.market_handler import MarketHandler
+
 
 from src.cli.account_context import AccountContext
 from src.cli.display_formatter import DisplayFormatter
@@ -27,9 +26,6 @@ from src.utils.logger_setup import logger, print_and_log
 # Импорты для типизации
 if TYPE_CHECKING:
     from src.trade_confirmation_manager import TradeConfirmationManager
-    from src.steampy.client import SteamClient
-    from src.steampy.confirmation import ConfirmationExecutor, Confirmation
-    from ..cli_interface import CLIInterface
 
 
 class CLIContextProtocol(Protocol):
@@ -277,7 +273,7 @@ class AutoManager:
         """Выполняет все задачи автоматизации для указанного контекста и настроек."""
         try:
             print_and_log(f"[{context.account_name}] 🔍 Проверка cookies...")
-            if not context.cookie_checker.ensure_valid_cookies(show_info=False):
+            if not context.cookie_checker.ensure_valid_cookies(show_info=True):
                 print_and_log(f"[{context.account_name}] ⚠️ Cookies невалидны. Пропуск итерации.")
                 return
 
@@ -456,7 +452,14 @@ class AutoManager:
     def _process_market_confirmations(self, context: AccountContext):
         """Обработка подтверждений маркета"""
         try:
-            from src.cli.market_handler import MarketHandler
+            
+            # Детальное логирование для отладки
+            logger.info(f"[{context.account_name}] 🏪 Проверка подтверждений маркета...")
+            logger.info(f"[{context.account_name}] ℹ️ Фильтруются только market подтверждения (листинги и покупки)")
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Создание MarketHandler...")
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: context.trade_manager = {type(context.trade_manager)} (id: {id(context.trade_manager)})")
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: context.cookie_checker = {type(context.cookie_checker)} (id: {id(context.cookie_checker)})")
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: context.cookie_manager = {type(context.cookie_manager)} (id: {id(context.cookie_manager)})")
             
             market_handler = MarketHandler(
                 context.trade_manager,
@@ -464,17 +467,34 @@ class AutoManager:
                 context.cookie_checker
             )
             
-            print_and_log(f"[{context.account_name}] 🏪 Проверка подтверждений маркета...")
-            print_and_log(f"[{context.account_name}] ℹ️ Фильтруются только market подтверждения (листинги и покупки)")
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: MarketHandler создан, вызываем confirm_all_market_orders()...")
+            
+            # Проверим состояние cookies перед вызовом
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Проверяем cookies перед обработкой...")
+            cookies_valid = context.cookie_checker.ensure_valid_cookies(show_info=True)
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Cookies валидны: {cookies_valid}")
+            
+            if not cookies_valid:
+                logger.info(f"[{context.account_name}] ❌ Cookies невалидны, пропускаем market подтверждения")
+                return
+            
+            # Проверим Steam клиента
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Получаем Steam клиента...")
+            steam_client = context.trade_manager._get_steam_client()
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Steam клиент получен: {type(steam_client) if steam_client else None}")
+            
             result = market_handler.confirm_all_market_orders()
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: confirm_all_market_orders() вернул: {result}")
             
             if result:
-                print_and_log(f"[{context.account_name}] ✅ Подтверждения маркета обработаны")
+                logger.info(f"[{context.account_name}] ✅ Подтверждения маркета обработаны")
             else:
-                print_and_log(f"[{context.account_name}] ℹ️ Нет подтверждений маркета или ошибка обработки")
+                logger.info(f"[{context.account_name}] ℹ️ Нет подтверждений маркета или ошибка обработки")
 
         except Exception as e:
-            print_and_log(f"[{context.account_name}] ❌ Ошибка обработки подтверждений маркета: {e}")
+            logger.info(f"[{context.account_name}] ❌ Ошибка обработки подтверждений маркета: {e}")
+            import traceback
+            logger.info(f"[{context.account_name}] 🔧 DEBUG: Полная ошибка:\n{traceback.format_exc()}")
     
     def _wait_or_stop(self, seconds: int) -> bool:
         """

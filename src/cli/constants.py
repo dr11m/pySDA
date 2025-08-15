@@ -186,4 +186,7 @@ class Config:
     REQUIRED_FIELDS = ['username', 'password', 'mafile_path', 'steam_id']
     
     # Важные cookies
-    IMPORTANT_COOKIES = ['sessionid', 'steamLoginSecure'] 
+    IMPORTANT_COOKIES = ['sessionid', 'steamLoginSecure']
+    
+    # Ключи глобальных настроек
+    CHECK_IP_ON_EVERY_STEAM_REQUEST = 'check_ip_on_every_steam_request' 
