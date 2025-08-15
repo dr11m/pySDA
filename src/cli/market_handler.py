@@ -3,15 +3,17 @@
 Обработчик market ордеров для CLI интерфейса
 """
 
-import re
-from typing import List, Optional
+from typing import List
 
-from bs4 import BeautifulSoup
 
 from src.utils.logger_setup import logger, print_and_log
 from .constants import Messages
 from .display_formatter import DisplayFormatter
 from src.trade_confirmation_manager import TradeConfirmationManager
+from src.steampy.confirmation import ConfirmationExecutor
+from src.utils.confirmation_utils import determine_confirmation_type_from_json, extract_confirmation_info
+from src.steampy.confirmation import Confirmation
+
 
 class MarketHandler:
     """Обработчик подтверждения market ордеров"""
@@ -88,8 +90,12 @@ class MarketHandler:
     def _get_confirmations_via_guard(self, steam_client) -> List[dict]:
         """Получение подтверждений через прямое обращение к Guard"""
         try:
-            from src.steampy.confirmation import ConfirmationExecutor
-            from src.utils.confirmation_utils import determine_confirmation_type_from_json, extract_confirmation_info
+
+            
+            logger.info("🔧 DEBUG: Создаем ConfirmationExecutor...")
+            logger.info(f"🔧 DEBUG: steam_client.steam_guard = {type(steam_client.steam_guard)}")
+            logger.info(f"🔧 DEBUG: steam_client.steam_id = {steam_client.steam_id}")
+            logger.info(f"🔧 DEBUG: steam_client._session = {type(steam_client._session)}")
             
             # Создаем executor для подтверждений
             confirmation_executor = ConfirmationExecutor(
@@ -98,16 +104,26 @@ class MarketHandler:
                 session=steam_client._session
             )
             
+            logger.info("🔧 DEBUG: ConfirmationExecutor создан, получаем страницу подтверждений...")
+            
             # Получаем JSON с подтверждениями напрямую
             confirmations_page = confirmation_executor._fetch_confirmations_page()
+            logger.info(f"🔧 DEBUG: _fetch_confirmations_page() вернула: {type(confirmations_page)}, status_code: {confirmations_page.status_code if hasattr(confirmations_page, 'status_code') else 'N/A'}")
+            
             confirmations_json = confirmations_page.json()
+            logger.info(f"🔧 DEBUG: JSON ответ: success={confirmations_json.get('success')}, conf count={len(confirmations_json.get('conf', []))}")
             
             if not confirmations_json.get('success'):
                 logger.error("❌ Не удалось получить подтверждения")
+                logger.info(f"🔧 DEBUG: Ответ сервера: {confirmations_json}")
                 return []
             
             all_confirmations = confirmations_json.get('conf', [])
             logger.info(f"🔍 Получено {len(all_confirmations)} подтверждений, фильтруем market...")
+            
+            # Выводим все подтверждения для отладки
+            for i, conf_data in enumerate(all_confirmations):
+                logger.info(f"🔧 DEBUG: Подтверждение {i+1}: id={conf_data.get('id')}, type={conf_data.get('type')}, type_name={conf_data.get('type_name')}")
             
             # Фильтруем market подтверждения по JSON данным
             market_confirmations = []
@@ -115,18 +131,20 @@ class MarketHandler:
                 try:
                     # Получаем тип подтверждения
                     confirmation_type = determine_confirmation_type_from_json(conf_data)
+                    logger.info(f"🔧 DEBUG: Подтверждение {conf_data.get('id')} имеет тип: {confirmation_type}")
                     
                     # Проверяем, является ли это market подтверждением
                     if confirmation_type in ['market_listing', 'market_purchase']:
+                        logger.info(f"🔧 DEBUG: Найдено market подтверждение типа {confirmation_type}")
+                        
                         # Получаем описание через единую функцию
                         confirmation_info = extract_confirmation_info(conf_data, confirmation_type)
                         description = confirmation_info.get('description', f'Market {confirmation_type}')
                         
                         # Показываем описание пользователю
-                        print_and_log(f"🏪 {description}")
+                        logger.info(f"🏪 {description}")
                         
                         # Создаем объект Confirmation для совместимости
-                        from src.steampy.confirmation import Confirmation
                         conf = Confirmation(
                             data_confid=conf_data['id'],
                             nonce=conf_data['nonce'],
@@ -147,13 +165,15 @@ class MarketHandler:
                     continue
             
             if market_confirmations:
-                print_and_log(f"✅ Найдено {len(market_confirmations)} market подтверждений для обработки")
+                logger.info(f"✅ Найдено {len(market_confirmations)} market подтверждений для обработки")
             else:
-                print_and_log("ℹ️ Нет market подтверждений")
+                logger.info("ℹ️ Нет market подтверждений")
             return market_confirmations
             
         except Exception as e:
             logger.error(f"❌ Ошибка получения подтверждений через Guard: {e}")
+            import traceback
+            logger.info(f"🔧 DEBUG: Полная ошибка в _get_confirmations_via_guard:\n{traceback.format_exc()}")
             return []
 
     

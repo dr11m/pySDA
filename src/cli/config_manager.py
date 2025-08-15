@@ -138,6 +138,27 @@ class ConfigManager:
             return []
         return list(self.accounts_settings.keys())
     
+    def get_account_display_name(self, account_name: str) -> str:
+        """
+        Получить отображаемое имя аккаунта с описанием
+        
+        Args:
+            account_name: Имя аккаунта
+            
+        Returns:
+            Строка вида "username - description" или просто "username"
+        """
+        if not self.accounts_settings or account_name not in self.accounts_settings:
+            return account_name
+            
+        account_config = self.accounts_settings[account_name]
+        description = account_config.get('description')
+        
+        if description:
+            return f"{account_name} - {description}"
+        else:
+            return account_name
+    
     def __str__(self) -> str:
         """Строковое представление конфигурации"""
         if not self.is_loaded():
