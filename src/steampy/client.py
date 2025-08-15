@@ -106,11 +106,13 @@ class SteamClient:
         original_post = self._session.post
         
         def wrapped_get(*args, **kwargs):
-            check_ip(self._session)
+            # Проверяем IP перед запросом
+            check_ip(original_get)
             return original_get(*args, **kwargs)
             
         def wrapped_post(*args, **kwargs):
-            check_ip(self._session)
+            # Проверяем IP перед запросом
+            check_ip(original_get)
             return original_post(*args, **kwargs)
         
         self._session.get = wrapped_get
