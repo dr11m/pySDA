@@ -198,7 +198,7 @@ class CookieManager:
         logger.error(f"❌ Все попытки входа исчерпаны ({max_retries})")
         return False
     
-    def is_cookies_valid(self, max_age_minutes: int = 120) -> bool:
+    def is_cookies_valid(self, max_age_minutes: int = 1200) -> bool:
         """Проверка актуальности cookies"""
         # Проверяем время последнего обновления
         last_update = self.storage.get_last_update(self.username)
@@ -265,7 +265,7 @@ class CookieManager:
                     self.storage.save_cookies(self.username, self.cookies_cache)
                     return self.cookies_cache
 
-            self.steam_client.update_session()
+            self.steam_client.login_if_need_to()
             
             # Получаем cookies из сессии
             cookies = session_to_dict(self.steam_client._session)
@@ -302,6 +302,7 @@ class CookieManager:
         """
         # Если есть кэш и он актуален - возвращаем его
         if self.cookies_cache and self.is_cookies_valid():
+            logger.info(f"✅ Cookies актуальны, возвращаем кэш для {self.username}")
             return self.cookies_cache
         
         # Пробуем загрузить из хранилища
@@ -314,6 +315,7 @@ class CookieManager:
         
         # Если нужно автообновление - обновляем
         if auto_update:
+            logger.info(f"🔄 Обновление cookies для {self.username} так как auto_update = True и прошло больше 120 минут")
             return self.update_cookies()
         
         logger.warning("⚠️ Cookies неактуальны, но автообновление отключено")

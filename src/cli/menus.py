@@ -36,7 +36,8 @@ class MainMenu(BaseMenu):
     def _update_title(self):
         """Обновляет заголовок меню, чтобы показать выбранный аккаунт."""
         if self.cli.selected_account_name:
-            self.title = f"{Messages.MAIN_TITLE} - Аккаунт: [{self.cli.selected_account_name}]"
+            display_name = self.cli.config_manager.get_account_display_name(self.cli.selected_account_name)
+            self.title = f"{Messages.MAIN_TITLE} - Аккаунт: [{display_name}]"
         else:
             self.title = f"{Messages.MAIN_TITLE} - [Аккаунт не выбран]"
 
@@ -242,7 +243,8 @@ class AccountActionsMenu(NavigableMenu):
     def _update_title(self):
         """Обновляет заголовок меню, чтобы показать выбранный аккаунт."""
         if self.cli.selected_account_name:
-            self.title = f"👤 Действия с аккаунтом - [{self.cli.selected_account_name}]"
+            display_name = self.cli.config_manager.get_account_display_name(self.cli.selected_account_name)
+            self.title = f"👤 Действия с аккаунтом - [{display_name}]"
         else:
             self.title = f"👤 Действия с аккаунтом - [Аккаунт не выбран]"
     
@@ -934,7 +936,8 @@ class AutoMenu(NavigableMenu):
             print_and_log("Доступные аккаунты:")
             for i, name in enumerate(all_account_names, 1):
                 status = "✅" if name in auto_accounts else "❌"
-                print_and_log(f"  {i}. {name} {status}")
+                display_name = self.cli.config_manager.get_account_display_name(name)
+                print_and_log(f"  {i}. {status} {display_name}")
             
             print_and_log(f"  0. ⬅️  Назад")
             print_and_log("\nВыберите аккаунт для переключения:")
@@ -951,10 +954,12 @@ class AutoMenu(NavigableMenu):
                     # Переключаем статус аккаунта
                     if selected_account in auto_accounts:
                         auto_accounts.remove(selected_account)
-                        print_and_log(f"❌ Аккаунт '{selected_account}' удален из автоматизации")
+                        display_name = self.cli.config_manager.get_account_display_name(selected_account)
+                        print_and_log(f"❌ Аккаунт '{display_name}' удален из автоматизации")
                     else:
                         auto_accounts.append(selected_account)
-                        print_and_log(f"✅ Аккаунт '{selected_account}' добавлен в автоматизацию")
+                        display_name = self.cli.config_manager.get_account_display_name(selected_account)
+                        print_and_log(f"✅ Аккаунт '{display_name}' добавлен в автоматизацию")
                     
                     # Сохраняем обновленный список
                     try:
@@ -1003,7 +1008,8 @@ class AutoMenu(NavigableMenu):
 
         print_and_log("Выберите аккаунт для настройки:")
         for i, name in enumerate(account_names, 1):
-            print_and_log(f"  {i}. {name}")
+            display_name = self.cli.config_manager.get_account_display_name(name)
+            print_and_log(f"  {i}. {display_name}")
         print_and_log("  0. Назад")
         
         try:

@@ -90,7 +90,8 @@ class SteamBotCLI:
             
         print(self.formatter.format_section_header("Выберите аккаунт"))
         for i, name in enumerate(account_names, 1):
-            print(f"  {i}. {name}")
+            display_name = self.config_manager.get_account_display_name(name)
+            print(f"  {i}. {display_name}")
         print("  0. Назад")
         
         while True:
@@ -101,7 +102,8 @@ class SteamBotCLI:
                 choice_idx = int(choice) - 1
                 if 0 <= choice_idx < len(account_names):
                     selected_name = account_names[choice_idx]
-                    print(f"Инициализация для аккаунта {selected_name}...")
+                    display_name = self.config_manager.get_account_display_name(selected_name)
+                    print(f"Инициализация для аккаунта {display_name}...")
                     return self.initialize_for_account(selected_name)
                 else:
                     print("Неверный номер. Попробуйте снова.")

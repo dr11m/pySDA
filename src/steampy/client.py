@@ -10,6 +10,7 @@ import requests
 from typing import Union
 import pickle
 from contextlib import contextmanager
+import yaml
 
 from . import guard
 from .confirmation import ConfirmationExecutor
@@ -40,6 +41,8 @@ from src.utils.logger_setup import logger
 from src.utils.compare_sessions import compare_sessions_and_log_diff
 from src.interfaces.storage_interface import CookieStorageInterface
 from src.utils.cookies_and_session import session_to_dict
+from src.utils.ip_utils import check_ip
+from src.cli.constants import Config
 
 
 class SteamClient:
@@ -86,7 +89,32 @@ class SteamClient:
         self._password = password
 
         self.market = SteamMarket(self._session, self.steam_id)
+        
+        # Переопределяем методы сессии для проверки IP если настройка включена
+        if self._should_check_ip():
+            self._wrap_session_methods()
     
+    def _should_check_ip(self) -> bool:
+        """Проверяет, нужно ли проверять IP перед запросами"""
+        with open(Config.DEFAULT_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = yaml.safe_load(f)
+            return config_data.get(Config.CHECK_IP_ON_EVERY_STEAM_REQUEST, False)
+    
+    def _wrap_session_methods(self):
+        """Оборачиваем методы сессии для проверки IP перед каждым запросом"""
+        original_get = self._session.get
+        original_post = self._session.post
+        
+        def wrapped_get(*args, **kwargs):
+            check_ip(self._session)
+            return original_get(*args, **kwargs)
+            
+        def wrapped_post(*args, **kwargs):
+            check_ip(self._session)
+            return original_post(*args, **kwargs)
+        
+        self._session.get = wrapped_get
+        self._session.post = wrapped_post
 
     @contextmanager
     def temporary_delay(self, new_delay: float = 0.1):
