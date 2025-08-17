@@ -15,6 +15,7 @@ from src.interfaces.storage_interface import CookieStorageInterface as StorageIn
 from src.utils.delayed_http_adapter import DelayedHTTPAdapter
 from src.utils.cookies_and_session import session_to_dict
 from src.utils.logger_setup import print_and_log
+from src.cli.config_manager import global_config
 
 
 class CookieManager:
@@ -198,8 +199,12 @@ class CookieManager:
         logger.error(f"❌ Все попытки входа исчерпаны ({max_retries})")
         return False
     
-    def is_cookies_valid(self, max_age_minutes: int = 1200) -> bool:
+    def is_cookies_valid(self, max_age_minutes: int = None) -> bool:
         """Проверка актуальности cookies"""
+        # Используем значение из конфига, если не передано явно
+        if max_age_minutes is None:
+            max_age_minutes = global_config.get_max_cookie_age_minutes()
+        
         # Проверяем время последнего обновления
         last_update = self.storage.get_last_update(self.username)
         if not last_update:
@@ -260,6 +265,7 @@ class CookieManager:
                 is_username_exist =self.steam_client.check_session_static(self.username, self.steam_client._session)
                 if is_username_exist is True:
                     #обновляем время
+                    logger.info(f"🍪 Cookies актуальны после проверки! Обновляем время последнего обновления cookies для {self.username}")
                     self.last_update = datetime.now()
                     self.cookies_cache = self.storage.load_cookies(self.username)
                     self.storage.save_cookies(self.username, self.cookies_cache)
@@ -315,7 +321,8 @@ class CookieManager:
         
         # Если нужно автообновление - обновляем
         if auto_update:
-            logger.info(f"🔄 Обновление cookies для {self.username} так как auto_update = True и прошло больше 120 минут")
+            max_age = global_config.get_max_cookie_age_minutes()
+            logger.info(f"🔄 Обновление cookies для {self.username} так как auto_update = True и прошло больше {max_age} минут")
             return self.update_cookies()
         
         logger.warning("⚠️ Cookies неактуальны, но автообновление отключено")
@@ -351,7 +358,7 @@ class CookieManager:
                 # Проверяем активность текущей сессии
                 if self._is_session_alive():
                     logger.info("✅ Сессия активна")
-                    self.steam_client.was_login_executed = True
+                    self.steam_client.was_login_executed = True  # Set flag to indicate login is done
                 else:
                     logger.info("⚠️ Сессия неактивна, выполняем вход...")
                     # Выполняем вход

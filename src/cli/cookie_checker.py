@@ -4,91 +4,70 @@ Cookie Checker - Автоматическая проверка и обновле
 """
 
 from typing import Optional, Callable, Any
-from .constants import Messages
 from .display_formatter import DisplayFormatter
 from src.utils.logger_setup import logger
-
+from src.cookie_manager import CookieManager
+from src.utils.logger_setup import print_and_log
+from .config_manager import global_config
 
 class CookieChecker:
     """Проверщик cookies для автоматического обновления при необходимости"""
     
     def __init__(self, cookie_manager, formatter: DisplayFormatter):
-        self.cookie_manager = cookie_manager
-        self.formatter = formatter
+        self.cookie_manager: CookieManager = cookie_manager
+        self.formatter: DisplayFormatter = formatter
     
-    def ensure_valid_cookies(self, max_age_minutes: int = 1000, show_info: bool = True) -> bool:
+    def ensure_valid_cookies(self, max_age_minutes: int = None) -> bool:
         """
         Убедиться, что cookies актуальны, обновить при необходимости
         
         Args:
-            max_age_minutes: Максимальный возраст cookies в минутах
-            show_info: Показывать информацию о процессе
+            max_age_minutes: Максимальный возраст cookies в минутах (если None, используется значение из конфига)
             
         Returns:
             bool: True если cookies актуальны или успешно обновлены
         """
         try:
+            # Используем значение из конфига, если не передано явно
+            if max_age_minutes is None:
+                max_age_minutes = global_config.get_max_cookie_age_minutes()
+            
             # Проверяем актуальность cookies
             if self.cookie_manager.is_cookies_valid(max_age_minutes):
-                if show_info:
-                    logger.info("✅ Cookies актуальны")
+                print_and_log("✅ Cookies актуальны")
                 return True
             
             # Cookies неактуальны, обновляем
-            if show_info:
-                print("🔄 Cookies устарели, обновляем...")
+            print_and_log("🔄 Cookies устарели, обновляем...")
             
             cookies = self.cookie_manager.update_cookies()
             
             if cookies:
-                if show_info:
-                    print("✅ Cookies успешно обновлены")
+                print_and_log("✅ Cookies успешно обновлены")
                 return True
             else:
-                if show_info:
-                    print("❌ Не удалось обновить cookies")
+                print_and_log("❌ Не удалось обновить cookies")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Ошибка проверки cookies: {e}")
-            if show_info:
-                print(f"❌ Ошибка проверки cookies: {e}")
+            print_and_log(f"❌ Ошибка проверки cookies: {e}")
             return False
     
-    def with_valid_cookies(self, action: Callable[[], Any], max_age_minutes: int = 120, show_info: bool = True) -> Any:
-        """
-        Выполнить действие с предварительной проверкой cookies
-        
-        Args:
-            action: Функция для выполнения
-            max_age_minutes: Максимальный возраст cookies
-            show_info: Показывать информацию о процессе
-            
-        Returns:
-            Результат выполнения action или None при ошибке
-        """
-        if not self.ensure_valid_cookies(max_age_minutes, show_info):
-            return None
-        
-        try:
-            return action()
-        except Exception as e:
-            logger.error(f"❌ Ошибка выполнения действия: {e}")
-            if show_info:
-                print(f"❌ Ошибка выполнения действия: {e}")
-            return None
 
 
-def requires_cookies(max_age_minutes: int = 120, show_info: bool = True):
+def requires_cookies(max_age_minutes: int = None, show_info: bool = True):
     """
     Декоратор для методов, требующих актуальных cookies
     
     Args:
-        max_age_minutes: Максимальный возраст cookies
+        max_age_minutes: Максимальный возраст cookies (если None, используется значение из конфига)
         show_info: Показывать информацию о процессе
     """
     def decorator(func):
         def wrapper(self, *args, **kwargs):
+            # Используем значение из конфига, если не передано явно
+            actual_max_age = max_age_minutes if max_age_minutes is not None else global_config.get_max_cookie_age_minutes()
+            
             # Предполагаем, что у объекта есть cookie_checker
             if hasattr(self, 'cookie_checker'):
                 checker = self.cookie_checker
@@ -100,7 +79,7 @@ def requires_cookies(max_age_minutes: int = 120, show_info: bool = True):
                 return None
             
             # Проверяем cookies перед выполнением
-            if not checker.ensure_valid_cookies(max_age_minutes, show_info):
+            if not checker.ensure_valid_cookies(actual_max_age):
                 return None
             
             # Выполняем оригинальную функцию

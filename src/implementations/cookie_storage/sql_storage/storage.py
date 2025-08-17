@@ -114,6 +114,7 @@ class SqlAlchemyCookieStorage(CookieStorageInterface):
                 # Обновляем существующую запись
                 existing_record.cookies = json.dumps(cookies)
                 existing_record.update_time = datetime.now(timezone.utc)
+                logger.info(f"✅ Cookies для {username} обновлены в БД")
             else:
                 # Создаем новую запись
                 new_record = SteamAccount(
@@ -122,6 +123,7 @@ class SqlAlchemyCookieStorage(CookieStorageInterface):
                     update_time=datetime.now(timezone.utc)
                 )
                 session.add(new_record)
+                logger.info(f"✅ Cookies для {username} созданы в БД")
             
             session.commit()
             return True

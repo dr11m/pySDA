@@ -273,7 +273,7 @@ class AutoManager:
         """Выполняет все задачи автоматизации для указанного контекста и настроек."""
         try:
             print_and_log(f"[{context.account_name}] 🔍 Проверка cookies...")
-            if not context.cookie_checker.ensure_valid_cookies(show_info=True):
+            if not context.cookie_checker.ensure_valid_cookies():
                 print_and_log(f"[{context.account_name}] ⚠️ Cookies невалидны. Пропуск итерации.")
                 return
 
@@ -471,7 +471,7 @@ class AutoManager:
             
             # Проверим состояние cookies перед вызовом
             logger.info(f"[{context.account_name}] 🔧 DEBUG: Проверяем cookies перед обработкой...")
-            cookies_valid = context.cookie_checker.ensure_valid_cookies(show_info=True)
+            cookies_valid = context.cookie_checker.ensure_valid_cookies()
             logger.info(f"[{context.account_name}] 🔧 DEBUG: Cookies валидны: {cookies_valid}")
             
             if not cookies_valid:

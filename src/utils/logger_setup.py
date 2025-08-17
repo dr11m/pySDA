@@ -2,18 +2,18 @@ from loguru import logger
 import os
 import yaml
 
-def load_config():
-    """Загружает конфигурацию из config.yaml"""
+def load_debug_config():
+    """Загружает только debug настройки для логирования из config.yaml"""
     try:
         with open('config.yaml', 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f) or {}
+            return config.get('debug_console_output', False)
     except Exception:
-        # Если файл не найден или ошибка - возвращаем дефолтные настройки
-        return {'debug_console_output': False}
+        # Если файл не найден или ошибка - возвращаем дефолт
+        return False
 
-# Загружаем конфигурацию
-config = load_config()
-debug_console_output = config.get('debug_console_output', False)
+# Загружаем только debug настройку для логирования
+debug_console_output = load_debug_config()
 
 # Создаём папку для логов если её нет
 os.makedirs("logs", exist_ok=True)
