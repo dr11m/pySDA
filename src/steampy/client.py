@@ -207,10 +207,14 @@ class SteamClient:
         return proxies
 
     def login_if_need_to(self):        
+        if self.was_login_executed:
+            logger.info(f"✅ Login already executed for {self.username}, skipping check")
+            return
+        
         if not self.check_session_static(self.username, self._session):
             self.update_session()
         else:
-            print(f"✅ Сессия активна для {self.username}")
+            logger.info(f"✅ Сессия активна для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
 
