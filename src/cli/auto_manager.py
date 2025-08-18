@@ -281,7 +281,7 @@ class AutoManager:
 
             # Получаем все трейды один раз для всех операций
             print_and_log(f"[{context.account_name}] 🔍 Получение трейдов...")
-            trade_offers = context.trade_manager.get_trade_offers(active_only=False)
+            trade_offers = context.trade_manager.get_trade_offers(active_only=False, use_webtoken=True)
             if not trade_offers:
                 print_and_log(f"[{context.account_name}] ℹ️ Нет трейдов для обработки")
                 return

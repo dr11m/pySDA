@@ -262,7 +262,7 @@ class CookieManager:
             
             if not force:
                 print_and_log(f"🔄 Проверяем активность сессии для {self.username}, если она активна, то обновление не требуется")
-                is_username_exist =self.steam_client.check_session_static(self.username, self.steam_client._session)
+                is_username_exist = self.steam_client.check_session_via_trade_url(self.username, self.steam_client._session)
                 if is_username_exist is True:
                     #обновляем время
                     logger.info(f"🍪 Cookies актуальны после проверки! Обновляем время последнего обновления cookies для {self.username}")
@@ -283,7 +283,7 @@ class CookieManager:
             
             # Сохраняем cookies в хранилище
             if self.storage.save_cookies(self.username, cookies):
-                logger.info("✅ Cookies сохранены в хранилище")
+                print_and_log("✅ Cookies сохранены в хранилище")
                 self.cookies_cache = cookies
                 self.last_update = datetime.now()
             else:
