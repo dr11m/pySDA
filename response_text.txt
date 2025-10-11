@@ -1,0 +1,875 @@
+<!doctype html>
+<html class=" responsive desktopui" lang="en">
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+			<meta name="viewport" content="width=device-width,initial-scale=1">
+		<meta name="theme-color" content="#171a21">
+		<title>trade offer with ynelson</title>
+	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+	
+	
+	<link href="https://community.akamai.steamstatic.com/public/shared/css/motiva_sans.css?v=g517uopauy8x&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/shared/css/buttons.css?v=wgcgw2rjiiq0&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/shared/css/shared_global.css?v=sts4zlozxc-j&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/css/globalv2.css?v=ydookt9os9ho&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/css/skin_1/headerless_page.css?v=bmabnoawpzto&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/css/skin_1/economy.css?v=h2mdux5tu2l1&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/css/skin_1/trade.css?v=pamr-bv0x2k9&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/shared/css/shared_responsive.css?v=_qi5q3ir0jfd&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<link href="https://community.akamai.steamstatic.com/public/css/skin_1/header.css?v=cmt0gkdqa1ot&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<script type="text/javascript">
+	var __prototypepreserve=[];
+	__prototypepreserve[0] = array.from;
+	__prototypepreserve[1] = array.prototype.filter;
+	__prototypepreserve[2] = array.prototype.flatmap;
+	__prototypepreserve[3] = array.prototype.find;
+	__prototypepreserve[4] = array.prototype.some;
+	__prototypepreserve[5] = function.prototype.bind;
+	__prototypepreserve[6] = htmlelement.prototype.scrollto;
+</script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/prototype-1.7.js?v=npjelbnreo6w&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript">
+	array.from = __prototypepreserve[0] || array.from;
+	array.prototype.filter = __prototypepreserve[1] || array.prototype.filter;
+	array.prototype.flatmap = __prototypepreserve[2] || array.prototype.flatmap;
+	array.prototype.find = __prototypepreserve[3] || array.prototype.find;
+	array.prototype.some = __prototypepreserve[4] || array.prototype.some;
+	function.prototype.bind = __prototypepreserve[5] || function.prototype.bind;
+	htmlelement.prototype.scrollto = __prototypepreserve[6] || htmlelement.prototype.scrollto;
+</script>
+<script type="text/javascript">
+	var __scriptaculouspreserve=[];
+	__scriptaculouspreserve[0] = array.from;
+	__scriptaculouspreserve[1] = function.prototype.bind;
+	__scriptaculouspreserve[2] = htmlelement.prototype.scrollto;
+</script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/scriptaculous/_combined.js?v=pbdakocdigbc&amp;l=english&amp;_cdn=akamai&amp;load=effects,controls,slider,dragdrop"></script>
+<script type="text/javascript">
+	array.from = __scriptaculouspreserve[0] || array.from;
+	function.prototype.bind = __scriptaculouspreserve[1] || function.prototype.bind;
+	htmlelement.prototype.scrollto = __scriptaculouspreserve[2] || htmlelement.prototype.scrollto;
+delete string['__parsestyleelement'];  prototype.browser.webkit = true;</script>
+<script type="text/javascript">valve_public_path = "https:\/\/community.akamai.steamstatic.com\/public\/";</script><script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/global.js?v=slcqm66klsre&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/jquery-1.11.1.min.js?v=gqhvlrk4-jx-&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/shared/javascript/tooltip.js?v=4dcbm51eoju9&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/shared/javascript/shared_global.js?v=yjgtnz8wf36p&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/shared/javascript/auth_refresh.js?v=w6qbwi-5-j2s&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript">object.seal && [ object, array, string, number ].map( function( builtin ) { object.seal( builtin.prototype ); } );</script><script type="text/javascript">$j = jquery.noconflict();
+if ( typeof json != 'object' || !json.stringify || !json.parse ) { document.write( "<scr" + "ipt type=\"text\/javascript\" src=\"https:\/\/community.akamai.steamstatic.com\/public\/javascript\/json2.js?v=54nknglvgto8&amp;l=english&amp;_cdn=akamai\"><\/script>\n" ); };
+</script>
+		<script type="text/javascript">
+			document.addeventlistener('domcontentloaded', function(event) {
+				setuptooltips( { tooltipcssclass: 'community_tooltip'} );
+		});
+		</script><script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/modalv2.js?v=zbxeuexvq0fz&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/economy_common.js?v=gyfvzltxyajc&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/economy.js?v=atnpihnmcoen&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/economy_trade.js?v=gzmwopdzglgk&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/economy_tradeoffer.js?v=zlgfoj4uu60o&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/shared/javascript/shared_responsive_adapter.js?v=dzsqasxkrnll&amp;l=english&amp;_cdn=akamai"></script>
+
+						<meta name="twitter:card" content="summary_large_image">
+					<meta name="robots" content="noindex">
+			
+	<meta name="twitter:site" content="@steam" />
+
+						<meta property="og:title" content="trade offer with ynelson">
+					<meta property="twitter:title" content="trade offer with ynelson">
+					<meta property="og:type" content="website">
+					<meta property="fb:app_id" content="105386699540688">
+			
+	
+			<link rel="image_src" href="https://community.akamai.steamstatic.com/public/shared/images/responsive/steam_share_image.jpg">
+		<meta property="og:image" content="https://community.akamai.steamstatic.com/public/shared/images/responsive/steam_share_image.jpg">
+		<meta name="twitter:image" content="https://community.akamai.steamstatic.com/public/shared/images/responsive/steam_share_image.jpg" />
+					<meta property="og:image:secure" content="https://community.akamai.steamstatic.com/public/shared/images/responsive/steam_share_image.jpg">
+				
+	
+	
+	
+	
+	</head>
+<body class="tutorial_mode headerless_page responsive_page ">
+
+
+<div class="responsive_page_frame no_header">
+			
+		<div class="responsive_local_menu_tab"></div>
+
+		<div class="responsive_page_menu_ctn localmenu">
+			<div class="responsive_page_menu"  id="responsive_page_local_menu" data-panel="{&quot;onoptionsactiondescription&quot;:&quot;#filter_toggle&quot;,&quot;onoptionsbutton&quot;:&quot;responsive_togglelocalmenu()&quot;,&quot;oncancelbutton&quot;:&quot;responsive_togglelocalmenu()&quot;}">
+				<div class="localmenu_content" data-panel="{&quot;maintainy&quot;:true,&quot;bfocusringroot&quot;:true,&quot;flow-children&quot;:&quot;column&quot;}">
+				</div>
+			</div>
+		</div>
+
+
+
+		
+		<div class="responsive_page_content_overlay">
+
+		</div>
+
+		<div class="responsive_fixonscroll_ctn nonresponsive_hidden no_menu">
+		</div>
+	
+	<div class="responsive_page_content">
+
+		<script type="text/javascript">
+	g_sessionid = "4a11f8ae1d5198935421b3ae";
+	g_steamid = "76561199522438827";
+	g_strlanguage = "english";
+	g_snr = '2_tradeoffer_4_';
+	g_ballowappimpressions = true;
+		g_contentdescriptorpreferences = [1,3,4];
+
+	
+
+	// we always want to have the timezone cookie set for php to use
+	settimezonecookies();
+
+	$j( function() {
+
+		initminiprofilehovers(( 'https%3a%2f%2fsteamcommunity.com' ));
+		initemoticonhovers();
+		applyadultcontentpreferences();
+	});
+
+	$j( function() { initeconomyhovers( "https:\/\/community.akamai.steamstatic.com\/public\/css\/skin_1\/economy.css?v=h2mdux5tu2l1&l=english&_cdn=akamai", "https:\/\/community.akamai.steamstatic.com\/public\/javascript\/economy_common.js?v=gyfvzltxyajc&l=english&_cdn=akamai", "https:\/\/community.akamai.steamstatic.com\/public\/javascript\/economy.js?v=atnpihnmcoen&l=english&_cdn=akamai" );});</script>
+<script>window.g_wapit="eyaidhlwijogikpxvcisicjhbgcioiairwreu0eiih0.eyaiaxnzijogini6mdawof8ynke4mtmxnl84qtzbrsisicjzdwiioiainzy1njexotk1mji0mzg4mjcilcaiyxvkijogwyaid2viomnvbw11bml0esigxswgimv4cci6ide3ntu1nda2odusicjuymyioiaxnzq2odeznzy0lcaiawf0ijogmtc1ntq1mzc2ncwgimp0asi6iciwmde5xzi2qzzdm0q3xzrfnjreiiwgim9hdci6ide3ntmymdqyntcsicjydf9lehaioiaxnzcxmzc4mdm3lcaicgvyijogmcwgimlwx3n1ymply3qioiainjqumtm3lje4ljewmyisicjpcf9jb25maxjtzxiioiainjqumtm3lje4ljewmyigfq.xys1wdhpw9lpyk3lgrmdl68hbj9giyj9mja_zspipwo7xvsz8-znmjxzhoynr3adj7lwcohcalsvwqe6kf5odq";</script><div id="application_config" style="display: none;"  data-config="{&quot;euniverse&quot;:1,&quot;web_universe&quot;:&quot;public&quot;,&quot;language&quot;:&quot;english&quot;,&quot;country&quot;:&quot;ru&quot;,&quot;media_cdn_community_url&quot;:&quot;https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/&quot;,&quot;media_cdn_url&quot;:&quot;https:\/\/cdn.akamai.steamstatic.com\/&quot;,&quot;video_cdn_url&quot;:&quot;https:\/\/video.akamai.steamstatic.com\/&quot;,&quot;community_cdn_url&quot;:&quot;https:\/\/community.akamai.steamstatic.com\/&quot;,&quot;community_cdn_asset_url&quot;:&quot;https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/assets\/&quot;,&quot;store_cdn_url&quot;:&quot;https:\/\/store.akamai.steamstatic.com\/&quot;,&quot;public_shared_url&quot;:&quot;https:\/\/community.akamai.steamstatic.com\/public\/shared\/&quot;,&quot;community_base_url&quot;:&quot;https:\/\/steamcommunity.com\/&quot;,&quot;chat_base_url&quot;:&quot;https:\/\/steamcommunity.com\/&quot;,&quot;store_base_url&quot;:&quot;https:\/\/store.steampowered.com\/&quot;,&quot;store_checkout_base_url&quot;:&quot;https:\/\/checkout.steampowered.com\/&quot;,&quot;img_url&quot;:&quot;https:\/\/community.akamai.steamstatic.com\/public\/images\/&quot;,&quot;steamtv_base_url&quot;:&quot;https:\/\/steam.tv\/&quot;,&quot;help_base_url&quot;:&quot;https:\/\/help.steampowered.com\/&quot;,&quot;partner_base_url&quot;:&quot;https:\/\/partner.steamgames.com\/&quot;,&quot;stats_base_url&quot;:&quot;https:\/\/partner.steampowered.com\/&quot;,&quot;internal_stats_base_url&quot;:&quot;https:\/\/steamstats.valve.org\/&quot;,&quot;in_client&quot;:false,&quot;use_popups&quot;:false,&quot;store_icon_base_url&quot;:&quot;https:\/\/shared.akamai.steamstatic.com\/store_item_assets\/steam\/apps\/&quot;,&quot;store_item_base_url&quot;:&quot;https:\/\/shared.akamai.steamstatic.com\/store_item_assets\/&quot;,&quot;webapi_base_url&quot;:&quot;https:\/\/api.steampowered.com\/&quot;,&quot;token_url&quot;:&quot;https:\/\/steamcommunity.com\/chat\/clientjstoken&quot;,&quot;build_timestamp&quot;:1755038039,&quot;page_timestamp&quot;:1755485637,&quot;in_tenfoot&quot;:false,&quot;in_gamepadui&quot;:false,&quot;in_chromeos&quot;:false,&quot;in_mobile_webview&quot;:false,&quot;platform&quot;:&quot;unknown&quot;,&quot;base_url_store_cdn_assets&quot;:&quot;https:\/\/cdn.akamai.steamstatic.com\/store\/&quot;,&quot;erealm&quot;:1,&quot;login_base_url&quot;:&quot;https:\/\/login.steampowered.com\/&quot;,&quot;avatar_base_url&quot;:&quot;https:\/\/avatars.akamai.steamstatic.com\/&quot;,&quot;from_web&quot;:true,&quot;website_id&quot;:&quot;community&quot;,&quot;base_url_shared_cdn&quot;:&quot;https:\/\/shared.akamai.steamstatic.com\/&quot;,&quot;clan_cdn_asset_url&quot;:&quot;https:\/\/clan.akamai.steamstatic.com\/&quot;,&quot;community_assets_base_url&quot;:&quot;https:\/\/shared.akamai.steamstatic.com\/community_assets\/&quot;,&quot;snr&quot;:&quot;2_tradeoffer_4_&quot;}" data-userinfo="{&quot;logged_in&quot;:true,&quot;steamid&quot;:&quot;76561199522438827&quot;,&quot;accountid&quot;:1562173099,&quot;account_name&quot;:&quot;jeyriyf42r&quot;,&quot;is_support&quot;:false,&quot;is_limited&quot;:false,&quot;is_partner_member&quot;:false,&quot;country_code&quot;:&quot;ru&quot;,&quot;excluded_content_descriptors&quot;:[1,3,4]}" data-community="[]" data-loyaltystore="{&quot;webapi_token&quot;:&quot;eyaidhlwijogikpxvcisicjhbgcioiairwreu0eiih0.eyaiaxnzijogini6mdawof8ynke4mtmxnl84qtzbrsisicjzdwiioiainzy1njexotk1mji0mzg4mjcilcaiyxvkijogwyaid2viomnvbw11bml0esigxswgimv4cci6ide3ntu1nda2odusicjuymyioiaxnzq2odeznzy0lcaiawf0ijogmtc1ntq1mzc2ncwgimp0asi6iciwmde5xzi2qzzdm0q3xzrfnjreiiwgim9hdci6ide3ntmymdqyntcsicjydf9lehaioiaxnzcxmzc4mdm3lcaicgvyijogmcwgimlwx3n1ymply3qioiainjqumtm3lje4ljewmyisicjpcf9jb25maxjtzxiioiainjqumtm3lje4ljewmyigfq.xys1wdhpw9lpyk3lgrmdl68hbj9giyj9mja_zspipwo7xvsz8-znmjxzhoynr3adj7lwcohcalsvwqe6kf5odq&quot;}" data-loyalty_webapi_token="&quot;eyaidhlwijogikpxvcisicjhbgcioiairwreu0eiih0.eyaiaxnzijogini6mdawof8ynke4mtmxnl84qtzbrsisicjzdwiioiainzy1njexotk1mji0mzg4mjcilcaiyxvkijogwyaid2viomnvbw11bml0esigxswgimv4cci6ide3ntu1nda2odusicjuymyioiaxnzq2odeznzy0lcaiawf0ijogmtc1ntq1mzc2ncwgimp0asi6iciwmde5xzi2qzzdm0q3xzrfnjreiiwgim9hdci6ide3ntmymdqyntcsicjydf9lehaioiaxnzcxmzc4mdm3lcaicgvyijogmcwgimlwx3n1ymply3qioiainjqumtm3lje4ljewmyisicjpcf9jb25maxjtzxiioiainjqumtm3lje4ljewmyigfq.xys1wdhpw9lpyk3lgrmdl68hbj9giyj9mja_zspipwo7xvsz8-znmjxzhoynr3adj7lwcohcalsvwqe6kf5odq&quot;" data-steam_notifications="{&quot;notifications&quot;:[{&quot;notification_id&quot;:&quot;114162424034&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1168456815,\&quot;tradeoffer_id\&quot;:\&quot;8339413523\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1754999709,&quot;hidden&quot;:0,&quot;expiry&quot;:1756209302,&quot;viewed&quot;:1754999969},{&quot;notification_id&quot;:&quot;114162424188&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1222191691,\&quot;tradeoffer_id\&quot;:\&quot;8339413643\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1754999710,&quot;hidden&quot;:0,&quot;expiry&quot;:1756209306,&quot;viewed&quot;:1754999969},{&quot;notification_id&quot;:&quot;114162424246&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1223218743,\&quot;tradeoffer_id\&quot;:\&quot;8339413598\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1754999710,&quot;hidden&quot;:0,&quot;expiry&quot;:1756209304,&quot;viewed&quot;:1754999969},{&quot;notification_id&quot;:&quot;114162424299&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:929819795,\&quot;tradeoffer_id\&quot;:\&quot;8339413484\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1754999710,&quot;hidden&quot;:0,&quot;expiry&quot;:1756209300,&quot;viewed&quot;:1754999969},{&quot;notification_id&quot;:&quot;114162548205&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:337492953,\&quot;tradeoffer_id\&quot;:\&quot;8339416217\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1754999797,&quot;hidden&quot;:0,&quot;expiry&quot;:1756209390,&quot;viewed&quot;:1754999969},{&quot;notification_id&quot;:&quot;114163548246&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:337893033,\&quot;tradeoffer_id\&quot;:\&quot;8339434320\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755000414,&quot;hidden&quot;:0,&quot;expiry&quot;:1756210008,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114163614991&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1222731896,\&quot;tradeoffer_id\&quot;:\&quot;8339435902\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755000458,&quot;hidden&quot;:0,&quot;expiry&quot;:1756210054,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114165828421&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1566445371,\&quot;tradeoffer_id\&quot;:\&quot;8339475998\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755001854,&quot;hidden&quot;:0,&quot;expiry&quot;:1756211452,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114166183387&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:336658577,\&quot;tradeoffer_id\&quot;:\&quot;8339481626\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755002053,&quot;hidden&quot;:0,&quot;expiry&quot;:1756211649,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114166445608&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:314269718,\&quot;tradeoffer_id\&quot;:\&quot;8339486814\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755002239,&quot;hidden&quot;:0,&quot;expiry&quot;:1756211838,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114351443669&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1207668353,\&quot;tradeoffer_id\&quot;:\&quot;8344247728\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755184758,&quot;hidden&quot;:0,&quot;expiry&quot;:1756394325,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114352986304&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:481126442,\&quot;tradeoffer_id\&quot;:\&quot;8344285782\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755185953,&quot;hidden&quot;:0,&quot;expiry&quot;:1756395542,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114353659647&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:87079648,\&quot;tradeoffer_id\&quot;:\&quot;8344304171\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755186554,&quot;hidden&quot;:0,&quot;expiry&quot;:1756396148,&quot;viewed&quot;:1755189212},{&quot;notification_id&quot;:&quot;114359427936&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:997323537,\&quot;tradeoffer_id\&quot;:\&quot;8344454651\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755191821,&quot;hidden&quot;:0,&quot;expiry&quot;:1756401309,&quot;viewed&quot;:1755206279},{&quot;notification_id&quot;:&quot;114366497302&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1710705670,\&quot;tradeoffer_id\&quot;:\&quot;8344578785\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755197284,&quot;hidden&quot;:0,&quot;expiry&quot;:1756406853,&quot;viewed&quot;:1755206279},{&quot;notification_id&quot;:&quot;114463031685&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1531875076,\&quot;tradeoffer_id\&quot;:\&quot;8346584147\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755271160,&quot;hidden&quot;:0,&quot;expiry&quot;:1756480760,&quot;viewed&quot;:1755272453},{&quot;notification_id&quot;:&quot;114463090308&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1531209915,\&quot;tradeoffer_id\&quot;:\&quot;8346586512\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755271234,&quot;hidden&quot;:0,&quot;expiry&quot;:1756480833,&quot;viewed&quot;:1755272453},{&quot;notification_id&quot;:&quot;114463090509&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:1329501960,\&quot;tradeoffer_id\&quot;:\&quot;8346586513\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755271235,&quot;hidden&quot;:0,&quot;expiry&quot;:1756480833,&quot;viewed&quot;:1755272453},{&quot;notification_id&quot;:&quot;114628839394&quot;,&quot;notification_targets&quot;:3,&quot;notification_type&quot;:9,&quot;body_data&quot;:&quot;{\&quot;sender\&quot;:336658577,\&quot;tradeoffer_id\&quot;:\&quot;8350836586\&quot;}&quot;,&quot;read&quot;:0,&quot;timestamp&quot;:1755434218,&quot;hidden&quot;:0,&quot;expiry&quot;:1756643808,&quot;viewed&quot;:0}],&quot;pending_gift_count&quot;:0,&quot;pending_friend_count&quot;:2,&quot;unread_count&quot;:19,&quot;pending_family_invite_count&quot;:0,&quot;success&quot;:1,&quot;rwgrsn&quot;:-2}"></div><link href="https://community.akamai.steamstatic.com/public/css/applications/community/main.css?v=75etykn0y2ll&amp;l=english&amp;_cdn=akamai" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/applications/community/manifest.js?v=3knjnpafvzpi&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/applications/community/libraries~b28b7af69.js?v=vuq6pxaayowe&amp;l=english&amp;_cdn=akamai"></script>
+<script type="text/javascript" src="https://community.akamai.steamstatic.com/public/javascript/applications/community/main.js?v=s5hdtqfpdkyh&amp;l=english&amp;_cdn=akamai"></script>
+	<div id="application_root"></div>
+
+		<div role="main" class="responsive_page_template_content" id="responsive_page_template_content" data-panel="{&quot;autofocus&quot;:true}" >
+
+				<div id="tutorial_header_message" class="responsive_trade_offersection top">
+		<div class="pagecontent">
+			<div class="economy_popup_msg trade_welcome_msg">
+				<div class="welcome_dismiss" onclick="tutorial.endtutorial();"></div>
+				<b>welcome to steam trade offers!</b>
+				<span id="trading_welcome_steps">
+					<span id="tutorial_message_step1" style="display: none;">step 1: select items from your inventory that you're willing to lose in exchange for the items you'd like from their inventory.</span>
+					<span id="tutorial_message_step2" style="display: none;">step 2: select items from their inventory that you'd like to receive.</span>
+					<span id="tutorial_message_step3" style="display: none;">step 3: add a message with your offer.</span>
+					<span id="tutorial_message_step4" style="display: none;">step 4: click the blue button when your offer is final and you are ready to trade.</span>
+					<span id="tutorial_message_step5" style="display: none;">step 5: click on "make offer" to send the offer to the other party.</span>
+				</span>
+			</div>
+		</div>
+	</div>
+
+<!-- main body -->
+<div class="pagecontent" id="maincontent">
+
+	<script>
+	// the number of days the trade will be placed on hold if the corresponding party is sending items in the trade.
+	// we round up, thus even a single second of escrow will be shown to the user.
+	var g_daysmyescrow = 0;
+	var g_daystheirescrow = 0;
+	var g_daysbothescrow = 0;
+</script>
+
+<div id="trade_escrow_header" class="trade_escrow_header responsive_trade_offersection" style="display: none">
+			<div class="trade_hold_time">trade will be held for: <span id="trade_escrow_hours"></span></div>
+		<div id="trade_escrow_for_me" style="display: none">- dreamchain has not been using the mobile authenticator for 7 days</div>
+		<div id="trade_escrow_for_them" style="display: none">- ynelson has not been using the mobile authenticator for 7 days</div>
+		<div>
+			<a href="javascript:void(0)" onclick="showescrowexplanationdialog( true );">learn more about how to remove the need for a trade hold</a>
+		</div>
+	</div>
+	
+<div class="trade_partner_header responsive_trade_offersection top">
+	<div class="trade_partner_headline">
+					this trade:&nbsp;
+			<span class="trade_partner_headline_sub">you are trading with <a href="https://steamcommunity.com/profiles/76561199534896639" data-miniprofile="1574630911">ynelson</a></span>&nbsp;
+					</div>
+
+	<div class="trade_partner_info_block">
+						<div class="trade_partner_icon"><img src="https://community.akamai.steamstatic.com/public/images/economy/market/icon_alertlistings.png" alt=""></div>
+				<div class="trade_partner_not_friends trade_partner_info_text">you are not friends with this user</div>
+						<div style="clear: left"></div>
+	</div>
+
+			<div class="trade_partner_info_block">
+			<div class="trade_partner_steam_level">
+				<div class="friendplayerlevel lvl_0"><span class="friendplayerlevelnum">1</span></div>			</div>
+			<div class="trade_partner_inline_hack">
+				<div class="trade_partner_steam_level_desc trade_partner_info_text">
+					<a href="https://steamcommunity.com/profiles/76561199534896639" data-miniprofile="1574630911">ynelson</a>				</div>
+				<div class="trade_partner_info_text">
+					has a steam level of 1				</div>
+			</div>
+		</div>
+
+					<div class="trade_partner_info_block limited">
+								<div class="trade_partner_icon years_of_service"><img src="https://community.akamai.steamstatic.com/public/images/badges/02_years/steamyears2_54.png" alt=""></div>
+								<div class="trade_partner_member trade_partner_info_text"><a href="https://steamcommunity.com/profiles/76561199534896639" data-miniprofile="1574630911">ynelson</a> has been on steam since</div>
+				<div class="trade_partner_member_since trade_partner_info_text ">3 august, 2023</div>
+				<div style="clear: left"></div>
+			</div>
+		
+			
+	<div style="clear: left"></div>
+</div>
+	<div class="trade_area">
+		<div class="trade_left">
+			<div class="trade_box" id="inventory_box" style="background: #0f0f0f;">
+				<div class="inventory_user_tabs selectablenone trade_responsive_hidden">
+											<div id="tutorial_arrow_step1" class="trade_offer_tutorial tutorial_arrow right" style="display: none;">
+							<div class="leftcap"></div>
+							<div class="rightcap"></div>
+							<div class="content">
+								step 1							</div>
+						</div>
+						<div id="tutorial_arrow_step2" class="trade_offer_tutorial tutorial_arrow left"  style="display: none;">
+							<div class="leftcap"></div>
+							<div class="rightcap"></div>
+							<div class="content">
+								step 2							</div>
+						</div>
+										<a id="inventory_select_your_inventory" href="#your_inventory" class="inventory_user_tab"><div>your inventory</div></a>
+					<a id="inventory_select_their_inventory" href="#their_inventory" class="inventory_user_tab" style="float:right"><div>their inventory</div></a>
+					<div class="inventory_user_tab_gap"><div>&nbsp;</div></div>
+					<div style="clear: both;"></div>
+				</div>
+				<div class="trade_box_contents" style="border-top:none; background: #1d1d1d;">
+					<div class="inventory_disabled selectablenone">
+					</div>
+					<div class="trade_nonresponsive_hidden">
+						<div class="responsive_trade_fixedcontents_spacer">
+						</div>
+						<div class="responsive_trade_fixedcontents your_inventory_only">
+							<div class="responsive_trade_prompt">
+								<div class="playeravatar offline">
+									<img src="https://avatars.akamai.steamstatic.com/6ac25bd4a109b0a4d96612f739f85043a2f00fd6.jpg" srcset="https://avatars.akamai.steamstatic.com/6ac25bd4a109b0a4d96612f739f85043a2f00fd6.jpg 1x, https://avatars.akamai.steamstatic.com/6ac25bd4a109b0a4d96612f739f85043a2f00fd6_medium.jpg 2x">								</div>
+								your inventory							</div>
+							<div class="sharedfiles_responsive_tab responsive_tab_ctn" id="responsive_tab_select_yourinventory">
+								<div class="responsive_tab_control">
+									<select>
+										<option value="">select an inventory to view items you can trade.</option>
+																					<option value="730">
+												counter-strike 2 (16)
+																							</option>
+																					<option value="753">
+												steam (12)
+																							</option>
+																					<option value="440">
+												team fortress 2 (1)
+																							</option>
+																					<option value="570">
+												dota 2 (1)
+																							</option>
+																					<option value="252490">
+												rust (1)
+																							</option>
+																			</select>
+								</div>
+							</div>
+							<div class="sharedfiles_responsive_tab responsive_tab_ctn" id="responsive_tab_select_yourcontexts" style="display: none;">
+								<div class="responsive_tab_control">
+									<select>
+									</select>
+								</div>
+							</div>
+							<div class="responsive_tab_baseline"></div>
+						</div>
+
+						<div class="responsive_trade_fixedcontents their_inventory_only">
+							<div class="responsive_trade_prompt">
+								<div class="playeravatar offline">
+									<img src="https://avatars.akamai.steamstatic.com/e49f5f7dd7042508f3844b7eecc847fd4b117c68.jpg" srcset="https://avatars.akamai.steamstatic.com/e49f5f7dd7042508f3844b7eecc847fd4b117c68.jpg 1x, https://avatars.akamai.steamstatic.com/e49f5f7dd7042508f3844b7eecc847fd4b117c68_medium.jpg 2x">								</div>
+								their inventory							</div>
+							<div class="sharedfiles_responsive_tab responsive_tab_ctn" id="responsive_tab_select_theirinventory">
+								<div class="responsive_tab_control">
+									<select>
+										<option value="">select an inventory to view items you can trade.</option>
+																					<option value="440">
+												team fortress 2 (1)
+											</option>
+																			</select>
+								</div>
+							</div>
+							<div class="sharedfiles_responsive_tab responsive_tab_ctn" id="responsive_tab_select_theircontexts" style="display: none;">
+								<div class="responsive_tab_control">
+									<select>
+									</select>
+								</div>
+							</div>
+							<div class="responsive_tab_baseline"></div>
+						</div>
+					</div>
+					<div class="selectablenone trade_responsive_hidden">
+						<div class="appselect" id="appselect" onclick="showmenu( 'appselect', getoptionsdivforactiveuser(), 'left' );">
+							<div id="appselect_activeapp" class="option">
+								<img src="https://community.akamai.steamstatic.com/public/images/economy/blank_gameicon.gif" width="32" height="32" alt=""> select an inventory to view items you can trade.							</div>
+							<div id="appselect_arrow"></div>
+						</div>
+						<div id="appselect_you_options" class="popup_block" style="display: none;">
+							<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>							<div class="appselect_options popup_body popup_menu shadow_content">
+																		<div class="option popup_menu_item has_submenu" id="appselect_option_you_730_0" onclick="javascript:tradepageselectinventory( useryou, 730, 0 );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/730/8dbc71957312bbd3baea65848b545be9eae2a355.jpg" alt=""> counter-strike 2										</div>
+										<div class="popup_block appselect_flyout" id="appselect_flyout_you_730" style="display: none; position: absolute;">
+											<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>											<div class="popup_body popup_menu shadow_content">
+																									<div class="option popup_menu_item" id="appselect_option_you_730_2" onclick="javascript:tradepageselectinventory( useryou, 730, &quot;2&quot; );">
+														 inventory (<span id="appselect_option_you_730_2_quantity">10</span>)
+													</div>
+																									<div class="option popup_menu_item" id="appselect_option_you_730_16" onclick="javascript:tradepageselectinventory( useryou, 730, &quot;16&quot; );">
+														 trade-protected items (<span id="appselect_option_you_730_16_quantity">6</span>)
+													</div>
+																							</div>
+										</div>
+										<script type="text/javascript">
+											registerflyout( $('appselect_option_you_730_0'), $('appselect_flyout_you_730'), 'rightsubmenu', 'bottomsubmenu' );
+										</script>
+																			<div class="option popup_menu_item has_submenu" id="appselect_option_you_753_0" onclick="javascript:tradepageselectinventory( useryou, 753, 0 );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/753/1d0167575d746dadea7706685c0f3c01c8aeb6d8.jpg" alt=""> steam										</div>
+										<div class="popup_block appselect_flyout" id="appselect_flyout_you_753" style="display: none; position: absolute;">
+											<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>											<div class="popup_body popup_menu shadow_content">
+																									<div class="option popup_menu_item" id="appselect_option_you_753_6" onclick="javascript:tradepageselectinventory( useryou, 753, &quot;6&quot; );">
+														 community (<span id="appselect_option_you_753_6_quantity">12</span>)
+													</div>
+																							</div>
+										</div>
+										<script type="text/javascript">
+											registerflyout( $('appselect_option_you_753_0'), $('appselect_flyout_you_753'), 'rightsubmenu', 'bottomsubmenu' );
+										</script>
+																			<div class="option popup_menu_item" id="appselect_option_you_440_2" onclick="javascript:tradepageselectinventory( useryou, 440, &quot;2&quot; );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/440/e3f595a92552da3d664ad00277fad2107345f743.jpg" alt=""> team fortress 2 (<span id="appselect_option_you_440_2_quantity">1</span>)
+										</div>
+																				<div class="option popup_menu_item" id="appselect_option_you_570_2" onclick="javascript:tradepageselectinventory( useryou, 570, &quot;2&quot; );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/570/0bbb630d63262dd66d2fdd0f7d37e8661a410075.jpg" alt=""> dota 2 (<span id="appselect_option_you_570_2_quantity">1</span>)
+										</div>
+																				<div class="option popup_menu_item" id="appselect_option_you_252490_2" onclick="javascript:tradepageselectinventory( useryou, 252490, &quot;2&quot; );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/252490/820be4782639f9c4b64fa3ca7e6c26a95ae4fd1c.jpg" alt=""> rust (<span id="appselect_option_you_252490_2_quantity">1</span>)
+										</div>
+																	</div>
+						</div>
+
+						<div id="appselect_them_options" class="popup_block" style="display: none;">
+							<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>							<div class="appselect_options popup_body popup_menu shadow_content">
+																		<div class="option popup_menu_item" id="appselect_option_them_440_2" onclick="javascript:tradepageselectinventory( userthem, 440, &quot;2&quot; );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/440/e3f595a92552da3d664ad00277fad2107345f743.jpg" alt=""> team fortress 2 (<span id="appselect_option_them_440_2_quantity">1</span>)
+										</div>
+																				<div class="option popup_menu_item has_submenu" id="appselect_option_them_753_0" onclick="javascript:tradepageselectinventory( userthem, 753, 0 );">
+											<img src="https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/753/1d0167575d746dadea7706685c0f3c01c8aeb6d8.jpg" alt=""> steam										</div>
+										<div class="popup_block appselect_flyout" id="appselect_flyout_them_753" style="display: none; position: absolute;">
+											<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>											<div class="popup_body popup_menu shadow_content">
+																									<div class="option popup_menu_item" id="appselect_option_them_753_3" onclick="javascript:tradepageselectinventory( userthem, 753, &quot;3&quot; );">
+														 coupons (<span id="appselect_option_them_753_3_quantity">0</span>)
+													</div>
+																									<div class="option popup_menu_item" id="appselect_option_them_753_6" onclick="javascript:tradepageselectinventory( userthem, 753, &quot;6&quot; );">
+														 community (<span id="appselect_option_them_753_6_quantity">0</span>)
+													</div>
+																									<div class="option popup_menu_item" id="appselect_option_them_753_7" onclick="javascript:tradepageselectinventory( userthem, 753, &quot;7&quot; );">
+														 item rewards (<span id="appselect_option_them_753_7_quantity">0</span>)
+													</div>
+																							</div>
+										</div>
+										<script type="text/javascript">
+											registerflyout( $('appselect_option_them_753_0'), $('appselect_flyout_them_753'), 'rightsubmenu', 'bottomsubmenu' );
+										</script>
+																</div>
+						</div>
+					</div>
+
+										<div class="trade_protected_potential_conflict">
+						<img src="https://community.akamai.steamstatic.com/public/images/economy/protected_items_badge2.png" />
+						<span>note: trades cannot contain items from both trade protected inventories and non trade protected inventories. <a target="_blank" href="https://help.steampowered.com/faqs/view/365f-4bee-2ae2-7bdd">learn more</a></span>
+					</div>
+
+					
+					<div id="responsivetrade_itemfilters">
+					</div>
+
+					<div class="trade_item_box selectablenone" id="inventories">
+						<div id="dropmsg">
+							<div class="inventorymsg_content">
+								remove from trade							</div>
+						</div>
+						<div class="inventory_ctn" id="trade_inventory_unavailable" style="display: none;">
+							<div class="inventorymsg_content selectabletext">
+								<div id="trade_inventory_message_no_inventory" style="display: none;">
+									you currently have 0 items in your <span class="gamename"></span> inventory.									<span id="trade_inventory_message_no_inventory_howtoget">
+									</span>
+								</div>
+								<div id="trade_inventory_message_not_allowed" style="display: none;">
+									<div id="trade_inventory_message_not_allowed_none">
+										you are not allowed to trade or receive items in <span class="gamename"></span>:									</div>
+									<div id="trade_inventory_message_not_allowed_receiveonly">
+										you are not allowed to add your <span class="gamename"></span> items to trades.  you may still receive items offered by friends.									</div>
+									<div id="trade_inventory_message_not_allowed_alerts">
+									</div>
+								</div>
+								<div id="trade_inventory_pending" style="display: none;">
+									<img src="https://community.akamai.steamstatic.com/public/images/login/throbber.gif" alt="">
+								</div>
+								<div id="trade_inventory_failed" style="display: none;">
+									this inventory is not available at this time.  please try again later.								</div>
+							</div>
+						</div>
+					</div>
+					<div id="inventory_pagecontrols" class="selectablenone" style="visibility: hidden;">
+						<a class="pagecontrol_element pagebtn" id="pagebtn_next" href="javascript:inventorynextpage();">
+							&gt;
+						</a>
+						<div class="pagecontrol_element pagecounts">
+							<span id="pagecontrol_cur"></span> of <span id="pagecontrol_max"></span>						</div>
+						<a class="pagecontrol_element pagebtn" id="pagebtn_previous" href="javascript:inventorypreviouspage();">
+							&lt;
+						</a>
+						<div style="clear: right;"></div>
+					</div>
+
+					<div id="inventory_displaycontrols" class="selectablenone">
+						displaying tradable items only					</div>
+					<div style="clear: right;"></div>
+
+					<div id="nonresponsivetrade_itemfilters">
+						<div class="trade_rule selectablenone trade_responsive_hidden"></div>
+						<div class="filter_ctn">
+							<div class="selectablenone">looking for a specific item?</div>
+
+							<div class="filter_control_ctn">
+								<div id="filter_clear_btn" style="display: none;"></div>
+								<input class="filter_search_box" type="text" id="filter_control" value="" placeholder="start typing item name..." name="filter" autocomplete="off">
+							</div>
+
+							<div class="filter_right_controls filter_tag_button_ctn">
+								<div class="btn_black btn_details btn_small" id="filter_tag_show" onclick="showtagfilters();">
+									<span>show advanced filters... <span class="btn_details_arrow down"></span></span>
+								</div>
+								<div class="btn_black btn_details btn_small" id="filter_tag_hide" onclick="hidetagfilters();" style="display: none;">
+									<span>hide advanced filters... <span class="btn_details_arrow up"></span></span>
+								</div>
+							</div>
+							<div style="clear: both;"></div>
+						</div>
+						<div class="filter_tag_options filter_collapsed selectablenone" id="filter_options" >
+						</div>
+					</div>
+
+					<div class="trade_nonresponsive_hidden responsivetrade_backtooffer_ctn">
+						<div id="responsivetrade_backtooffer" class="btn_grey_white_innerfade btn_medium">
+							<span>cancel</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="tradeoffer_log_ctn responsive_trade_offersection bottom">
+				<div id="log">
+				</div>
+			</div>
+
+												<div id="tradeoffer_addmessage" class="responsive_trade_offersection bottom" style="">
+						<h2>include a message with your offer:</h2>
+						<div class="log trade_box">
+															<div id="tutorial_arrow_step3" class="tutorial_arrow trade_offer_tutorial right" style="display: none;">
+									<div class="leftcap"></div>
+									<div class="rightcap"></div>
+									<div class="content">
+										step 3									</div>
+								</div>
+														<div class="log_chat_entry_area">
+								<form id="trade_offer_note_form" name="trade_offer_note_form" onsubmit="return false;">
+									<textarea name="trade_offer_note" id="trade_offer_note" maxlength="128" ></textarea>
+								</form>
+							</div>
+						</div>
+					</div>
+											
+		</div>
+		<div class="trade_right selectablenone">
+			<div class="your_items trade_box trade_box_withbg" id="trade_area" style="background: none;">
+				<div class="trade_box_bgheader"></div>
+				<div class="trade_box_contents" style="background: #1d1d1d;">
+					<div class="trade_offer" id="trade_yours">
+						<div class="offerheader">
+							<div class="offericon iconholder_offline">
+								<div class="avataricon"><img src="https://avatars.akamai.steamstatic.com/6ac25bd4a109b0a4d96612f739f85043a2f00fd6.jpg" alt="" data-miniprofile="1562173099"></div>
+							</div>
+							<div style="overflow: hidden;">
+								<h2 class="ellipsis">your items:</h2>
+								these are the items you will lose in the trade.							</div>
+							<div style="clear: left;"></div>
+						</div>
+						<div class="trade_item_box">
+							<div id="your_slots_currency">
+							</div>
+							<div id="your_slots">
+							</div>
+							<div style="clear: left;"></div>
+						</div>
+						<div class="tutorial_arrow_ctn">
+															<div id="tutorial_arrow_step4" class="tutorial_arrow trade_offer_tutorial left" style="display: none;">
+									<div class="leftcap"></div>
+									<div class="rightcap"></div>
+									<div class="content">
+										step 4									</div>
+								</div>
+														<div class="readystate" id="you_cantready">
+								<div class="content">
+									waiting for you to offer one or more items.								</div>
+							</div>
+							<div class="readystate" id="you_notready" onclick="toggleready( true );"  style="display: none;">
+								<div class="content">
+									click here to confirm trade contents.									<span id="notready_tradechanged_message" style="display: none;">
+										offer changed.									</span>
+								</div>
+							</div>
+							<div class="readystate" id="you_ready" onclick="toggleready( false );" style="display: none;">
+								<div class="content">
+									ready to trade.								</div>
+							</div>
+													</div>
+					</div>
+
+					<div id="trade_items_separator" class="trade_rule trade_rule_swap"></div>
+
+					<div class="trade_offer" id="trade_theirs">
+						<div id="trade_theirs_active" class="trade_box_bgheader active" style="left: -4px; right: -4px; top: -20px; display: none;"></div>
+						<div id="trade_theirs_timeout" style="display: none;">
+							<img src="https://community.akamai.steamstatic.com/public/images/login/throbber.gif" alt="">
+							<h2>waiting for ynelson</h2>
+						</div>
+						<div class="offerheader" style="position: relative;">
+							<div class="offericon iconholder_offline">
+								<div class="avataricon"><a href="https://steamcommunity.com/profiles/76561199534896639" target="_blank"><img src="https://avatars.akamai.steamstatic.com/e49f5f7dd7042508f3844b7eecc847fd4b117c68.jpg" alt="" data-miniprofile="1574630911"></a></div>
+							</div>
+							<div style="overflow: hidden;">
+								<h2><a href="https://steamcommunity.com/profiles/76561199534896639" target="_blank" style="color:inherit">ynelson</a>'s items:</h2>
+																	these are the items you will receive in the trade.															</div>
+							<div style="clear: left;"></div>
+						</div>
+						<div class="trade_item_box">
+							<div id="their_slots_currency">
+							</div>
+							<div id="their_slots">
+							</div>
+							<div style="clear: left;"></div>
+						</div>
+						<div class="tradeoffer_partner_ready_note">
+							ynelson will be notified of this trade offer through steam.						</div>
+						<div class="readystate" id="them_ready" style="display: none;">
+							<div class="content">
+								ready to trade.							</div>
+						</div>
+					</div>
+
+					<div class="trade_rule maketrade"></div>
+
+					<div class="trade_confirm_box tutorial_arrow_ctn">
+													<div id="tutorial_arrow_step5" class="trade_offer_tutorial tutorial_arrow left"  style="display: none;">
+								<div class="leftcap"></div>
+								<div class="rightcap"></div>
+								<div class="content">
+									step 5								</div>
+							</div>
+												
+						<div id="trade_escrow_notice_near_button" style="display: none">
+							trade will be held for: <span id="trade_escrow_hours2"></span>						</div>
+						
+						<div class="trade_protected_status_callout">
+							<img src="https://community.akamai.steamstatic.com/public/images/economy/protected_items_badge2.png" />
+							<span>these items will be trade protected for 7 days. <a target="_blank" href="https://help.steampowered.com/faqs/view/365f-4bee-2ae2-7bdd">learn more</a></span>
+						</div>
+
+						
+						<div id="trade_confirmbtn" class="trade_confirmbtn ellipsis" onclick="confirmtradeoffer();">
+							<div class="cap left"></div>
+							<div class="cap right"></div>
+							<div id="trade_confirmbtn_text">make offer</div>
+						</div>
+						<div id="trade_confirm_throbber" style="display: none;">
+							<img src="https://community.akamai.steamstatic.com/public/images/login/throbber.gif" alt="">
+						</div>
+						<div id="trade_confirm_message">
+							&nbsp;
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="cancelbtn_ctn">
+								<div class="btn_grey_black btn_medium" onclick="dismisstradeofferwindow()">
+					<span>cancel and close window</span>
+				</div>
+			</div>
+
+		</div>
+		<div style="clear: both;"></div>
+	</div>
+
+	<div id="foreign_assets" style="display: none;">
+	</div>
+
+	<div id="hover" class="selectablenone" style="display: none;">
+		<div class="shadow_ul"></div><div class="shadow_top"></div><div class="shadow_ur"></div><div class="shadow_left"></div><div class="shadow_right"></div><div class="shadow_bl"></div><div class="shadow_bottom"></div><div class="shadow_br"></div>		<div class="hover_box shadow_content" id="trade_hover">
+			<div class="item_desc_content" id="hover_content">
+				<div class="item_desc_icon">
+					<div class="item_desc_icon_center">
+						<img id="hover_item_icon" src="https://community.akamai.steamstatic.com/public/images/trans.gif" alt="">
+					</div>
+				</div>
+				<div class="item_desc_description">
+					<h1 class="hover_item_name" id="hover_item_name"></h1>
+					<div class="fraud_warning" id="hover_fraud_warnings">
+					</div>
+					<div class="item_desc_game_info" id="hover_game_info">
+						<div class="item_desc_game_icon">
+							<img id="hover_game_icon" src="https://community.akamai.steamstatic.com/public/images/trans.gif" alt="">
+						</div>
+						<div id="hover_game_name" class="ellipsis"></div>
+						<div id="hover_item_type" class=""></div>
+					</div>
+					<div class="item_desc_descriptors" id="hover_item_descriptors">
+					</div>
+					<div class="item_desc_descriptors" id="hover_item_owner_descriptors">
+					</div>
+					<div class="item_desc_descriptors currency_in_trade_descriptor" id="hover_currency_in_trade">
+
+					</div>
+									</div>
+			</div>
+		</div>
+	</div>
+
+</div>
+
+<div id="modalbg" class="selectablenone" style="display: none;"></div>
+<div id="trade_currency_dialog" style="display: none;">
+	<div id="trade_currency_dialog_title" class="trade_currency_dialog_title">
+		add <span id="trade_currency_dialog_currencyname1"></span> from <span id="trade_currency_dialog_contextname"></span>:	</div>
+	<div id="trade_currency_dialog_title_wallet" class="trade_currency_dialog_title">
+		add funds from your steam wallet:	</div>
+	<div id="trade_currency_dialog_input_area" class="currency_dialog_input_area">
+		<div id="trade_currency_dialog_input_icon_area">
+			<img id="trade_currency_dialog_symbol1" src="https://community.akamai.steamstatic.com/public/images/trans.gif" alt="">
+		</div>
+		<input type="text" name="trade_currency_input" id="trade_currency_input">
+	</div>
+	<div id="trade_currency_fee_information" class="trade_currency_fee_information">
+		<div class="trade_currency_fee_information_lines">
+			<div class="trade_currency_fee_amount">
+				+<span id="trade_currency_fee_amount_dollars"></span> steam transaction fee (<span id="trade_currency_fee_amount_percent"></span>%)			</div>
+			<div class="trade_currency_fee_total">
+				<span id="trade_currency_fee_total_dollars"></span> total cost to you			</div>
+		</div>
+	</div>
+	<div class="trade_currency_slider_ctn" id="trade_currency_slider_ctn">
+		<div class="trade_currency_slider_count" id="trade_currency_slider_count">0</div>
+		<div class="slider_background">
+			<div class="slider_progress"></div>
+		</div>
+		<div class="slider" id="trade_currency_slider">
+			<div class="handle">
+			</div>
+		</div>
+	</div>
+	<div id="trade_currency_dialog_error" class="trade_currency_dialog_error">
+	</div>
+	<div id="trade_currency_dialog_remaining" class="trade_currency_dialog_remaining">
+		<span id="trade_currency_dialog_fundsavailable">
+			<span id="trade_currency_dialog_currencyname2"></span> in this inventory:		</span>
+		<span id="trade_currency_dialog_fundsavailable_wallet">
+			funds available in your steam wallet:		</span>
+		<span style="white-space: nowrap;">
+			<img id="trade_currency_dialog_symbol2" src="https://community.akamai.steamstatic.com/public/images/trans.gif" alt="">
+			<span id="trade_currency_dialog_remaining_display"></span>
+		</span>
+	</div>
+</div>
+
+<div id="trade_currency_dialog_conversion" style="display: none;">
+	<div class="trade_currency_dialog_corner">
+	</div>
+	<div id="trade_currency_dialog_conversion_title" class="trade_currency_dialog_title">
+		add funds from your steam wallet:	</div>
+	<div id="trade_currency_dialog_conversion_info" class="trade_currency_dialog_info">
+		your wallet contains <span id="trade_currency_dialog_conversion_currencyname1"></span>, but <span id="trade_currency_dialog_conversion_username1"></span>'s wallet contains <span id="trade_currency_dialog_conversion_currencyname2"></span>. to make bartering easier, we're showing you what <span id="trade_currency_dialog_conversion_username2"></span> will receive.	</div>
+	<div id="trade_currency_dialog_conversion_input_area_you" class="currency_dialog_input_area currency_dialog_input_area_short">
+		<input type="text" name="trade_currency_input" id="trade_currency_conversion_input_you">
+	</div>
+	<div id="trade_currency_dialog_conversion_equals_sign">=</div>
+	<div id="trade_currency_dialog_conversion_input_area_them" class="currency_dialog_input_area currency_dialog_input_area_short">
+		<input type="text" name="trade_currency_input" id="trade_currency_conversion_input_them">
+	</div>
+	<div id="trade_currency_conversion_fee_information" class="trade_currency_fee_information">
+		<div class="trade_currency_fee_information_lines">
+			<div class="trade_currency_conversion_fee_amount">
+				+<span id="trade_currency_conversion_fee_amount_dollars"></span> steam transaction fee (<span id="trade_currency_conversion_fee_amount_percent"></span>%)			</div>
+			<div class="trade_currency_conversion_fee_total">
+				<span id="trade_currency_conversion_fee_total_dollars"></span> total cost to you			</div>
+		</div>
+	</div>
+	<div class="trade_currency_slider_ctn" id="trade_currency_conversion_slider_ctn">
+		<div class="trade_currency_slider_count" id="trade_currency_conversion_slider_count">999,999</div>
+		<div class="slider_background"></div>
+		<div class="slider_progress"></div>
+		<div class="slider" id="trade_currency_conversion_slider">
+			<div class="handle">
+			</div>
+		</div>
+	</div>
+	<div id="trade_currency_dialog_conversion_error" class="trade_currency_dialog_error">
+	</div>
+	<div id="trade_currency_dialog_conversion_remaining" class="trade_currency_dialog_remaining">
+		<span id="trade_currency_dialog_conversion_fundsavailable_wallet">
+			funds available in your steam wallet:		</span>
+		<span id="trade_currency_dialog_conversion_remaining_display"></span>
+	</div>
+	<div class="trade_currency_dialog_footer" id="trade_currency_dialog_conversion_footer">
+		<a id="trade_currency_dialog_conversion_accept" href="#" class="item_action">ok</a>
+		<a id="trade_currency_dialog_conversion_cancel" href="#" class="item_action">cancel</a>
+	</div>
+</div>
+
+<div id="trade_currency_dialog_warning" style="display: none;">
+	<div id="trade_currency_dialog_warning_title" class="trade_currency_dialog_title">
+		warning	</div>
+	<div id="trade_currency_dialog_warning_contents">
+	</div>
+	<div class="trade_currency_dialog_footer" id="trade_currency_dialog_warning_footer">
+		<a id="trade_currency_dialog_warning_accept" href="#" class="item_action">ok</a>
+	</div>
+</div>
+
+<div id="trade_action_popup" class="popup_block_new" style="display: none;">
+	<div class="popup_body popup_menu">
+		<div id="trade_action_popup_itemactions" style="display: none;">
+		</div>
+		<div id="trade_action_popup_itemstaticsep" style="display: none;">
+			<hr>
+		</div>
+		<div id="trade_action_popup_staticactions" style="display: none;">
+			<a id="trade_action_viewininventory" href="" target="_blank" class="popup_menu_item">view in inventory</a>
+			<a id="trade_action_viewinmarket" href="" target="_blank" target="_blank" class="popup_menu_item">view in community market</a>
+		</div>
+	</div>
+</div>
+
+<div style="display: none;" class="inventory_page_right">
+	<!-- iteminfo blocks used by responsive trade ui -->
+	<div class="inventory_iteminfo" id="iteminfo0" style="display: none;">
+	<div class="item_desc_content" id="iteminfo0_content">
+		<div class="item_desc_icon">
+			<div class="item_desc_icon_center">
+				<img id="iteminfo0_item_icon" src="https://community.akamai.steamstatic.com/public/images/trans.gif">
+			</div>
+		</div>
+		<div class="item_desc_description">
+			<h1 class="hover_item_name" id="iteminfo0_item_name"></h1>
+							<div class="fraud_warning" id="iteminfo0_fraud_warnings"></div>
+						<div class="item_desc_game_info" id="iteminfo0_game_info">
+				<div class="item_desc_game_icon">
+					<img id="iteminfo0_game_icon">
+				</div>
+				<div id="iteminfo0_game_name" class="ellipsis"></div>
+				<div id="iteminfo0_item_type" class=""></div>
+			</div>
+			<div class="item_desc_descriptors" id="iteminfo0_item_descriptors">
+			</div>
+							<div class="item_actions" id="iteminfo0_item_actions">
+				</div>
+										<div class="item_desc_descriptors" id="iteminfo0_item_owner_descriptors">
+				</div>
+									</div>
+	</div>
+			<div class="item_market_content" id="iteminfo0_market_content">
+			<div class="item_market_actions" id="iteminfo0_item_market_actions">
+			</div>
+		</div>
+				<div class="item_desc_addtotrade_ctn">
+			<div class="item_desc_addtotrade btn_green_white_innerfade">
+				<span></span>
+			</div>
+		</div>
+	</div>
+<div class="inventory_iteminfo" id="iteminfo1" style="display: none;">
+	<div class="item_desc_content" id="iteminfo1_content">
+		<div class="item_desc_icon">
+			<div class="item_desc_icon_center">
+				<img id="iteminfo1_item_icon" src="https://community.akamai.steamstatic.com/public/images/trans.gif">
+			</div>
+		</div>
+		<div class="item_desc_description">
+			<h1 class="hover_item_name" id="iteminfo1_item_name"></h1>
+							<div class="fraud_warning" id="iteminfo1_fraud_warnings"></div>
+						<div class="item_desc_game_info" id="iteminfo1_game_info">
+				<div class="item_desc_game_icon">
+					<img id="iteminfo1_game_icon">
+				</div>
+				<div id="iteminfo1_game_name" class="ellipsis"></div>
+				<div id="iteminfo1_item_type" class=""></div>
+			</div>
+			<div class="item_desc_descriptors" id="iteminfo1_item_descriptors">
+			</div>
+							<div class="item_actions" id="iteminfo1_item_actions">
+				</div>
+										<div class="item_desc_descriptors" id="iteminfo1_item_owner_descriptors">
+				</div>
+									</div>
+	</div>
+			<div class="item_market_content" id="iteminfo1_market_content">
+			<div class="item_market_actions" id="iteminfo1_item_market_actions">
+			</div>
+		</div>
+				<div class="item_desc_addtotrade_ctn">
+			<div class="item_desc_addtotrade btn_green_white_innerfade">
+				<span></span>
+			</div>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">
+var g_rgappcontextdata = {"730":{"appid":730,"name":"counter-strike 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/730\/8dbc71957312bbd3baea65848b545be9eae2a355.jpg","link":"https:\/\/steamcommunity.com\/app\/730","asset_count":16,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/730\/b8f472eb610ef69f8a97a4c3decd79ed791c0e9c.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":1,"rgcontexts":{"2":{"asset_count":10,"id":"2","name":"inventory","owner_only":false,"hide_context":false},"16":{"asset_count":6,"id":"16","name":"trade-protected items","owner_only":1,"hide_context":true}}},"753":{"appid":753,"name":"steam","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/753\/1d0167575d746dadea7706685c0f3c01c8aeb6d8.jpg","link":"https:\/\/steamcommunity.com\/app\/753","asset_count":12,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/753\/db8ca9e130b7b37685ab2229bf5a288aefc3f0fa.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"1":{"asset_count":0,"id":"1","name":"gifts","owner_only":false,"hide_context":false},"3":{"asset_count":0,"id":"3","name":"coupons","owner_only":false,"hide_context":false},"6":{"asset_count":12,"id":"6","name":"community","owner_only":false,"hide_context":false},"7":{"asset_count":0,"id":"7","name":"item rewards","owner_only":false,"hide_context":false}}},"440":{"appid":440,"name":"team fortress 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/440\/e3f595a92552da3d664ad00277fad2107345f743.jpg","link":"https:\/\/steamcommunity.com\/app\/440","asset_count":1,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/440\/e613d1d46de26ea755105b898cc8830d305353f3.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":1,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"570":{"appid":570,"name":"dota 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/570\/0bbb630d63262dd66d2fdd0f7d37e8661a410075.jpg","link":"https:\/\/steamcommunity.com\/app\/570","asset_count":1,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/570\/910ef16cd7bf6c6986e78b3ad4eee7eaa5d26cc0.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":1,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"252490":{"appid":252490,"name":"rust","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/252490\/820be4782639f9c4b64fa3ca7e6c26a95ae4fd1c.jpg","link":"https:\/\/steamcommunity.com\/app\/252490","asset_count":1,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/252490\/71aa51e17ef25a5e6c24b08019eb5482bd02261a.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":1,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"218620":{"appid":218620,"name":"payday 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/218620\/a6abc0d0c1e79c0b5b0f5c8ab81ce9076a542414.jpg","link":"https:\/\/steamcommunity.com\/app\/218620","asset_count":0,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/218620\/28737f6df9d94df0c8b08a82e8750fc0db6c98ea.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":0,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"232090":{"appid":232090,"name":"killing floor 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/232090\/15837cefb378766e9916548f8591b6eb490b9e52.jpg","link":"https:\/\/steamcommunity.com\/app\/232090","asset_count":0,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/232090\/4e67762974609ea461ec3b9bbf07e5a1d6c4f8c5.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":0,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"322330":{"appid":322330,"name":"don't starve together","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/322330\/a80aa6cff8eebc1cbc18c367d9ab063e1553b0ee.jpg","link":"https:\/\/steamcommunity.com\/app\/322330","asset_count":0,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/322330\/c0a9e18fea0eda7d1449cf3ee1087d26f37ed75e.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"1":{"asset_count":0,"id":"1","name":"inventory","owner_only":false,"hide_context":false}}},"2073850":{"appid":2073850,"name":"the finals","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/2073850\/9532db560dca3b4982f4af3f5981b6b2ce2a6909.jpg","link":"https:\/\/steamcommunity.com\/app\/2073850","asset_count":0,"trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":0,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}}};
+var g_rgplayedapps = {"753":true,"2073850":true,"730":true,"1100990":true,"1172470":true};
+var g_rgpartnerappcontextdata = {"440":{"appid":440,"name":"team fortress 2","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/440\/e3f595a92552da3d664ad00277fad2107345f743.jpg","link":"https:\/\/steamcommunity.com\/app\/440","asset_count":1,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/440\/e613d1d46de26ea755105b898cc8830d305353f3.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"2":{"asset_count":1,"id":"2","name":"backpack","owner_only":false,"hide_context":false}}},"753":{"appid":753,"name":"steam","icon":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/753\/1d0167575d746dadea7706685c0f3c01c8aeb6d8.jpg","link":"https:\/\/steamcommunity.com\/app\/753","asset_count":0,"inventory_logo":"https:\/\/cdn.akamai.steamstatic.com\/steamcommunity\/public\/images\/apps\/753\/db8ca9e130b7b37685ab2229bf5a288aefc3f0fa.png","trade_permissions":"full","load_failed":0,"store_vetted":"1","owner_only":false,"secure_trades":false,"rgcontexts":{"3":{"asset_count":0,"id":"3","name":"coupons","owner_only":false,"hide_context":false},"6":{"asset_count":0,"id":"6","name":"community","owner_only":false,"hide_context":false},"7":{"asset_count":0,"id":"7","name":"item rewards","owner_only":false,"hide_context":false}}}};
+var g_rgforeignappcontextdata = { };
+var g_rgwalletinfo = {"wallet_currency":5,"wallet_country":"ru","wallet_state":"","wallet_fee":"1","wallet_fee_minimum":"1","wallet_fee_percent":"0.05","wallet_publisher_fee_percent_default":"0.10","wallet_fee_base":"0","wallet_other_currency":5,"wallet_other_country":"ru","wallet_fee_base_for_other":"0","wallet_conversion_rate":"1.000000","wallet_inverse_conversion_rate":"1.000000","wallet_balance":"4792389","wallet_delayed_balance":"0","wallet_max_balance":"12500000","wallet_trade_max_balance":"11250000","success":true,"rwgrsn":-2};
+var g_strcountrycode = "ru";
+var g_bmarketallowed = true;
+var g_ultradepartnersteamid = '76561199534896639';
+var g_btradepartnerprobation = false;
+var g_sessionid = "4a11f8ae1d5198935421b3ae";
+
+var g_rgcurrenttradestatus = {"newversion":true,"version":1,"me":{"assets":[],"currency":[],"ready":false},"them":{"assets":[],"currency":[],"ready":false}};
+
+useryou.setprofileurl( "https:\/\/steamcommunity.com\/profiles\/76561199522438827" );
+useryou.setsteamid( '76561199522438827' );
+var g_stryourpersonaname = "dreamchain";
+var g_strinventoryloadurl = 'https://steamcommunity.com/profiles/76561199522438827/inventory/json/';
+
+userthem.setprofileurl( "https:\/\/steamcommunity.com\/profiles\/76561199534896639" );
+userthem.setsteamid( '76561199534896639' );
+var g_strtradepartnerpersonaname = "ynelson";
+var g_strtradepartnerinventoryloadurl = 'https://steamcommunity.com/tradeoffer/new/partnerinventory/';
+
+$j( function() {
+	useryou.loadcontexts( g_rgappcontextdata );
+	userthem.loadcontexts( g_rgpartnerappcontextdata );
+	begintradeoffer( 0, true );
+
+	
+	
+			ctradeofferstatemanager.settradeoffercreateparams( {"trade_offer_access_token":"7x0allnq"} );
+	} );
+</script>
+
+<script type="text/javascript">
+	var recaptchaonloadcallback = function() {
+	}
+</script>
+<script src="https://www.google.com/recaptcha/api.js?onload=recaptchaonloadcallback&render=explicit" async defer></script>
+
+		</div>	<!-- responsive_page_legacy_content -->
+
+		
+	</div>	<!-- responsive_page_content -->
+
+</div>	<!-- responsive_page_frame -->
+</body>
+</html>

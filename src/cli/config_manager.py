@@ -159,6 +159,15 @@ class ConfigManager:
         else:
             return account_name
     
+    def get_max_cookie_age_minutes(self) -> int:
+        """
+        Получить максимальный возраст cookies в минутах из конфигурации
+        
+        Returns:
+            int: Максимальный возраст cookies в минутах (по умолчанию 120)
+        """
+        return self.get('max_cookie_age_minutes', 120)
+    
     def __str__(self) -> str:
         """Строковое представление конфигурации"""
         if not self.is_loaded():
@@ -167,4 +176,9 @@ class ConfigManager:
         username = self.get('username', 'N/A')
         steam_id = self.get('steam_id', 'N/A')
         
-        return f"Активная конфигурация для: {username} (ID: {steam_id})" 
+        return f"Активная конфигурация для: {username} (ID: {steam_id})"
+
+
+# Глобальная инициализация настройки для использования в других модулях
+global_config = ConfigManager()
+global_config.load_config()
