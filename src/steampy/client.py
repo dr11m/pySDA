@@ -207,10 +207,14 @@ class SteamClient:
         return proxies
 
     def login_if_need_to(self):        
+        if self.was_login_executed:
+            logger.info(f"✅ Login already executed for {self.username}, skipping check")
+            return
+        
         if not self.check_session_static(self.username, self._session):
             self.update_session()
         else:
-            print(f"✅ Сессия активна для {self.username}")
+            logger.info(f"✅ Сессия активна для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
 
@@ -258,6 +262,52 @@ class SteamClient:
     def check_session_static(username, _session) -> bool:
         main_page_response = _session.get(SteamUrl.COMMUNITY_URL)
         return username.lower() in main_page_response.text.lower()
+    
+    @staticmethod
+    def check_session_via_trade_url(username, _session) -> bool:
+        """
+        Проверяет сессию через trade offer URL
+        
+        Args:
+            username: Имя пользователя для проверки
+            _session: HTTP сессия
+            
+        Returns:
+            bool: True если сессия активна, False если нет
+        """
+        try:
+            # Используем любой trade URL для проверки (этот партнер не важен)
+            trade_url = "https://steamcommunity.com/tradeoffer/new/?partner=1574630911&token=7x0AlLNq"
+            
+            response = _session.get(trade_url)
+            
+            # Логируем статус код и финальный URL
+            logger.info(f"🔍 Trade URL проверка: статус {response.status_code}")
+            logger.info(f"🔍 Trade URL проверка: финальный URL = {response.url}")
+            
+            # Проверяем финальный URL на наличие login
+            has_login_redirect = 'login' in response.url.lower()
+            if has_login_redirect:
+                logger.info(f"🔄 Trade URL проверка: редирект на login обнаружен - {response.url}")
+                return False
+
+            # Проверяем наличие username в содержимом страницы
+            username_lower = username.lower()
+            response_text = response.text.lower()
+            has_username = username_lower in response_text
+            
+            logger.info(f"🔍 Trade URL проверка: has_username = {has_username}")
+            
+            if has_username:
+                logger.info(f"✅ Trade URL проверка: сессия активна для {username}")
+                return True
+            else:
+                logger.info(f"❌ Trade URL проверка: сессия неактивна для {username} (username не найден)")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка проверки сессии через trade URL: {e}")
+            return False
 
     @login_required
     def save_session(self, path, username):
@@ -266,17 +316,14 @@ class SteamClient:
         print(f"💾 Сессия и refresh токен сохранены в pkl для {username}")
         
         # Обновляем cookies в БД через implementations
-        if hasattr(self, 'storage') and self.storage:
-            try:
-                cookies_dict = session_to_dict(self._session)
-                if self.storage.save_cookies(username, cookies_dict):
-                    logger.info(f"💾 Cookies обновлены в БД при сохранении сессии для {username}")
-                else:
-                    logger.warning(f"⚠️ Не удалось обновить cookies в БД при сохранении сессии для {username}")
-            except Exception as e:
-                logger.error(f"❌ Ошибка обновления cookies в БД при сохранении сессии для {username}: {e}")
-        else:
-            logger.info(f"ℹ️ Storage не настроен, пропускаем обновление cookies в БД для {username}")
+        try:
+            cookies_dict = session_to_dict(self._session)
+            if self.storage.save_cookies(username, cookies_dict):
+                logger.info(f"💾 Cookies обновлены в БД при сохранении сессии для {username}")
+            else:
+                logger.warning(f"⚠️ Не удалось обновить cookies в БД при сохранении сессии для {username}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка обновления cookies в БД при сохранении сессии для {username}: {e}")
 
     @login_required
     def logout(self) -> None:

@@ -127,8 +127,6 @@ class TradeConfirmationManager:
             api_response = steam_client.api_call('GET', 'IEconService', 'GetTradeOffers', 'v1', params)
             response_data = api_response.json()
             
-
-            
             # Парсим ответ напрямую как TradeOffersResponse
             trade_offers = TradeOffersResponse(**response_data.get('response', {}))
             
