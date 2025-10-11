@@ -262,8 +262,11 @@ class CookieManager:
             
             if not force:
                 print_and_log(f"🔄 Проверяем активность сессии для {self.username}, если она активна, то обновление не требуется")
-                is_username_exist = self.steam_client.check_session_via_trade_url(self.username, self.steam_client._session)
-                if is_username_exist is True:
+                is_username_exist_via_trade_url = self.steam_client.check_session_via_trade_url(self.username, self.steam_client._session)
+                is_username_exist = self.steam_client.check_session_static(self.username, self.steam_client._session)
+                print_and_log(f"🔄 is_username_exist_via_trade_url: {is_username_exist_via_trade_url}")
+                print_and_log(f"🔄 is_username_exist: {is_username_exist}")
+                if is_username_exist_via_trade_url is True and is_username_exist is True:
                     #обновляем время
                     logger.info(f"🍪 Cookies актуальны после проверки! Обновляем время последнего обновления cookies для {self.username}")
                     self.last_update = datetime.now()
