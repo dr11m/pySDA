@@ -1,59 +1,74 @@
-from loguru import logger
-import os
-import yaml
+"""Centralized Loguru configuration and logging helpers."""
 
-def load_debug_config():
-    """Загружает только debug настройки для логирования из config.yaml"""
+import os
+import sys
+
+import yaml
+from loguru import logger
+
+
+LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}"
+
+
+def load_debug_config() -> bool:
+    """Load debug logging flag from config.yaml."""
     try:
-        with open('config.yaml', 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f) or {}
-            return config.get('debug_console_output', False)
+        with open("config.yaml", "r", encoding="utf-8") as file:
+            config = yaml.safe_load(file) or {}
+            return bool(config.get("debug_console_output", False))
     except Exception:
-        # Если файл не найден или ошибка - возвращаем дефолт
         return False
 
-# Загружаем только debug настройку для логирования
-debug_console_output = load_debug_config()
 
-# Создаём папку для логов если её нет
+debug_console_output = load_debug_config()
 os.makedirs("logs", exist_ok=True)
 
-# Убираем стандартный вывод в консоль только если debug_console_output = False
-if not debug_console_output:
-    logger.remove()
+logger.remove()
 
-# Настройка основного лога (только в файл)
+if debug_console_output:
+    logger.add(
+        sys.stdout,
+        format=LOG_FORMAT,
+        level="DEBUG",
+        filter=lambda record: record["level"].no < 40,
+    )
+
 logger.add(
-    "logs/log.log", 
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {function} | {message}", 
-    rotation="10 MB", 
+    "logs/log.log",
+    format=LOG_FORMAT,
+    rotation="10 MB",
     retention=3,
-    level="DEBUG"
+    level="DEBUG",
 )
 
-# Настройка лога для ошибок (только в файл)
 logger.add(
-    "logs/error.log", 
-    backtrace=True, 
-    diagnose=True, 
-    rotation="5 MB", 
-    retention=2, 
-    filter=lambda record: record["level"].name == "ERROR",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {function} | {message}"
+    "logs/error.log",
+    format=LOG_FORMAT,
+    rotation="5 MB",
+    retention=2,
+    level="ERROR",
+    backtrace=True,
+    diagnose=False,
 )
 
-def print_and_log(message: str, level: str = "INFO"):
-    """
-    Выводит сообщение в консоль и записывает в лог.
-    
-    Args:
-        message: Сообщение для вывода
-        level: Уровень логирования (INFO, WARNING, ERROR, SUCCESS)
-    """
-    # Выводим в консоль
+logger.add(
+    sys.stderr,
+    format=LOG_FORMAT,
+    level="ERROR",
+    backtrace=True,
+    diagnose=False,
+)
+
+
+def log_exception(message: str) -> None:
+    """Log an active exception with traceback."""
+    logger.exception(message)
+
+
+def print_and_log(message: str, level: str = "INFO") -> None:
+    """Print a message and log it with the provided severity level."""
     print(message)
-    
-    # Записываем в лог
+
     if level == "INFO":
         logger.info(message)
     elif level == "WARNING":

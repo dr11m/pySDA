@@ -92,7 +92,7 @@ cp config.example.yaml config.yaml
 
 ```yaml
 # Отладочные настройки
-debug_console_output: true  # Вывод логов в консоль
+debug_console_output: true  # Дополнительный вывод DEBUG/INFO/WARNING в консоль
 
 # Минимальная задержка между запросами (в миллисекундах)
 min_request_delay_ms: 1000
@@ -115,6 +115,8 @@ accounts:
 
 **Важно**: Имя файла `.maFile` должно точно совпадать с именем аккаунта в конфигурации. Например, если в конфиге указан аккаунт `my_account_1`, то файл должен называться `my_account_1.maFile`.
 
+Начиная с текущей версии валидность `mafile_path` проверяется сразу при выборе аккаунта (fail-fast). Если путь неверный или файл отсутствует, контекст аккаунта не инициализируется, а в CLI выводится короткая ошибка.
+
 ### 5️⃣ **Запуск**
 
 ```bash
@@ -126,7 +128,12 @@ uv run python cli.py
 > - **macOS/Linux**: Обычно поддерживаются из коробки
 > - **Серверы**: Эмодзи автоматически отключаются на серверах без поддержки Unicode
 
-> **🔍 Отладка**: Если что-то не работает, подробные логи находятся в папке `logs/`. Также можно включить дебаг-режим в `config.yaml` установив `debug_console_output: true`
+> **🔍 Отладка**: Если что-то не работает, подробные логи находятся в папке `logs/`.
+> - `logs/log.log` — обычные логи приложения
+> - `logs/error.log` — только ошибки с traceback
+> - traceback для перехваченных исключений теперь всегда печатается в консоль (`stderr`) и сохраняется в `logs/error.log`
+> - используется режим `stack only` (`diagnose=False`) без дампа локальных переменных
+> - `debug_console_output: true` включает только дополнительный вывод DEBUG/INFO/WARNING в консоль
 
 
 
@@ -362,6 +369,8 @@ uv run python -m pytest tests/ tests_steampy/ --cov=src
 - **`test_error_tracking.py`** - Тестирование системы отслеживания ошибок
 - **`test_proxy_connection.py`** - Тестирование подключения к прокси
 - **`demo_error_tracking.py`** - Демонстрация системы отслеживания ошибок
+- **`test_config_manager.py`** - Проверка fail-fast валидации `mafile_path`
+- **`test_logger_setup.py`** - Проверка `log_exception()` и наличия traceback в логе
 
 #### 🔥 **Тесты Steam API** (`tests_steampy/`)
 - **`test_client.py`** - Тестирование основного Steam клиента
@@ -380,6 +389,9 @@ uv run python -m pytest tests/test_proxy_connection.py -v
 uv run python -m pytest tests_steampy/test_guard.py -v
 uv run python -m pytest tests_steampy/test_market.py -v
 uv run python -m pytest tests_steampy/test_utils.py -v
+
+# Проверка нового контракта ошибок
+uv run python -m pytest tests/test_config_manager.py tests/test_logger_setup.py tests_steampy/test_guard.py -q
 ```
 
 ### 📊 **Покрытие кода**

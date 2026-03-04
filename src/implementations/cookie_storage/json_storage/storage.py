@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Реализация интерфейса хранения cookies в виде JSON файлов.
-"""
+"""JSON-based cookie storage implementation."""
 
 import json
 from datetime import datetime
@@ -9,77 +7,68 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from src.interfaces.storage_interface import CookieStorageInterface
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import log_exception
+
 
 class JsonCookieStorage(CookieStorageInterface):
-    """
-    Реализация хранения cookies в файлах формата JSON.
-    Файлы хранятся в папке 'json_cookies'.
-    """
-    
+    """Store account cookies in JSON files under the storage directory."""
+
     def __init__(self, **kwargs):
-        # **kwargs используется для обратной совместимости, если фабрика передаст лишние параметры.
-        # Всегда используем фиксированный путь для этой реализации
         self.storage_dir = Path("src/implementations/cookie_storage/json_storage/cookies")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def save_cookies(self, username: str, cookies: Dict[str, str]) -> bool:
-        """Сохранить cookies в JSON файл"""
+        """Save cookies for an account."""
         try:
-            data = {
+            payload = {
                 "cookies": cookies,
-                "last_update": datetime.now().isoformat()
+                "last_update": datetime.now().isoformat(),
             }
-            
-            with open(self.storage_dir / f"{username}_cookies.json", 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
+            with open(self.storage_dir / f"{username}_cookies.json", "w", encoding="utf-8") as file:
+                json.dump(payload, file, indent=2, ensure_ascii=False)
             return True
-        except Exception as e:
-            logger.error(f"Ошибка сохранения cookie-файла для {username}: {e}")
+        except Exception:
+            log_exception(f"Failed to save cookie file for '{username}'.")
             return False
-    
+
     def load_cookies(self, username: str) -> Optional[Dict[str, str]]:
-        """Загрузить cookies из JSON файла"""
+        """Load cookies for an account."""
         cookie_file = self.storage_dir / f"{username}_cookies.json"
         if not cookie_file.exists():
             return None
-        
+
         try:
-            with open(cookie_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return data.get('cookies')
-        except (json.JSONDecodeError, Exception) as e:
-            logger.error(f"Ошибка загрузки cookie-файла для {username}: {e}")
+            with open(cookie_file, "r", encoding="utf-8") as file:
+                payload = json.load(file)
+            return payload.get("cookies")
+        except Exception:
+            log_exception(f"Failed to load cookie file for '{username}'.")
             return None
-    
+
     def delete_cookies(self, username: str) -> bool:
-        """Удалить файл с cookies"""
+        """Delete cookie file for an account."""
         try:
             cookie_file = self.storage_dir / f"{username}_cookies.json"
             if cookie_file.exists():
                 cookie_file.unlink()
-                logger.info(f"Удален cookie-файл для {username}")
             return True
-        except Exception as e:
-            logger.error(f"Ошибка удаления cookie-файла для {username}: {e}")
+        except Exception:
+            log_exception(f"Failed to delete cookie file for '{username}'.")
             return False
-    
+
     def get_last_update(self, username: str) -> Optional[datetime]:
-        """Получить время последнего обновления из файла"""
+        """Return last cookie update timestamp for an account."""
         cookie_file = self.storage_dir / f"{username}_cookies.json"
         if not cookie_file.exists():
             return None
-            
+
         try:
-            with open(cookie_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            last_update_str = data.get("last_update")
-            if last_update_str:
-                return datetime.fromisoformat(last_update_str)
-            
+            with open(cookie_file, "r", encoding="utf-8") as file:
+                payload = json.load(file)
+            last_update = payload.get("last_update")
+            if last_update:
+                return datetime.fromisoformat(last_update)
             return None
-        except (json.JSONDecodeError, Exception) as e:
-            logger.error(f"Ошибка чтения времени обновления из cookie-файла для {username}: {e}")
-            return None 
+        except Exception:
+            log_exception(f"Failed to read last update from cookie file for '{username}'.")
+            return None

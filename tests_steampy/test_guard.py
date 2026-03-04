@@ -1,8 +1,11 @@
+import json
+import os
+import tempfile
 from base64 import b64encode
 from unittest import TestCase
 
-from steampy import guard
-from steampy.confirmation import Tag
+from src.steampy import guard
+from src.steampy.confirmation import Tag
 
 
 class TestGuard(TestCase):
@@ -35,3 +38,26 @@ class TestGuard(TestCase):
         for key in expected_keys:
             assert key in guard_data
             assert isinstance(guard_data[key], str)
+
+    def test_load_steam_guard_from_file(self):
+        payload = {
+            "steamid": 12345678,
+            "shared_secret": "SHARED_SECRET",
+            "identity_secret": "IDENTITY_SECRET",
+        }
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".maFile", delete=False) as file:
+            json.dump(payload, file)
+            file_path = file.name
+
+        try:
+            guard_data = guard.load_steam_guard(file_path)
+            assert guard_data["steamid"] == "12345678"
+            assert guard_data["shared_secret"] == "SHARED_SECRET"
+            assert guard_data["identity_secret"] == "IDENTITY_SECRET"
+        finally:
+            os.remove(file_path)
+
+    def test_load_steam_guard_missing_path_raises_file_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            guard.load_steam_guard("accounts_info/not_exists_guard.maFile")

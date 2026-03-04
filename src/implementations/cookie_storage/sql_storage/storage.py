@@ -1,214 +1,161 @@
 #!/usr/bin/env python3
-"""
-Реализация интерфейса хранения cookies с использованием PostgreSQL и SQLAlchemy.
-"""
+"""SQLAlchemy storage implementation for Steam account cookies."""
 
-import os
 import json
-from pathlib import Path
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, Optional
 
 from dotenv import load_dotenv
-
-from sqlalchemy import create_engine, Column, String, Text, DateTime, Integer, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine, text
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from src.interfaces.storage_interface import CookieStorageInterface
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, log_exception
 
-env_path = Path(__file__).parent / '.env'
+
+env_path = Path(__file__).parent / ".env"
 if not env_path.exists():
-    # Если используется эта реализация, .env файл ОБЯЗАТЕЛЕН.
     raise FileNotFoundError(
-        f"Файл .env не найден по пути {env_path}. "
-        f"Для использования SqlAlchemyCookieStorage необходимо создать .env в папке implementations с переменной DB_CONNECTION_STRING. "
-        f"Скопируйте env.example из этой же папки в корень проекта и переименуйте в .env."
+        f"Missing .env file at {env_path}. "
+        "SqlAlchemyCookieStorage requires DB_CONNECTION_STRING in this directory."
     )
+
 load_dotenv(dotenv_path=env_path)
-
-
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
 
 Base = declarative_base()
 
+
 class SteamAccount(Base):
-    """Модель для таблицы, хранящей cookies аккаунтов Steam."""
-    __tablename__ = 'cookies'
-    __table_args__ = {'schema': 'steam_accounts'}
-    
+    """Table model for storing Steam account cookies."""
+
+    __tablename__ = "cookies"
+    __table_args__ = {"schema": "steam_accounts"}
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(100), unique=True, nullable=False, index=True)
-    cookies = Column(Text, nullable=True)  # JSON строка с cookies
-    update_time = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    cookies = Column(Text, nullable=True)
+    update_time = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    
-    def __repr__(self):
+
+    def __repr__(self) -> str:
         return f"<SteamAccount(username='{self.username}')>"
 
 
 class SqlAlchemyCookieStorage(CookieStorageInterface):
-    """
-    Хранит cookies в PostgreSQL.
-    Требует наличия переменной окружения DB_CONNECTION_STRING.
-    """
+    """Persist account cookies in PostgreSQL via SQLAlchemy."""
 
     def __init__(self, **kwargs):
-        """
-        Инициализирует подключение к БД.
-        Вызовет ошибку, если DB_CONNECTION_STRING не установлена.
-        """
         if not DB_CONNECTION_STRING:
             raise ValueError(
-                "Переменная окружения 'DB_CONNECTION_STRING' не установлена. "
-                "Невозможно инициализировать SqlAlchemyCookieStorage. "
-                "Добавьте ее в ваш .env файл."
+                "Environment variable 'DB_CONNECTION_STRING' is not set. "
+                "Cannot initialize SqlAlchemyCookieStorage."
             )
-            
-        logger.info("🚀 Инициализация SqlAlchemyCookieStorage...")
+
+        logger.info("Initializing SqlAlchemyCookieStorage...")
         self._setup_engine()
-        
-        # Создаем схему и таблицы
         self._create_schema_and_tables()
-        
         self.Session = sessionmaker(bind=self.engine)
-        logger.info("✅ SqlAlchemyCookieStorage успешно инициализирован.")
+        logger.info("SqlAlchemyCookieStorage initialized.")
 
-    def _create_schema_and_tables(self):
-        """Создает схему steam_accounts и все необходимые таблицы."""
-        try:
-            # Создаем схему, если её нет
-            with self.engine.connect() as connection:
-                connection.execute(text("CREATE SCHEMA IF NOT EXISTS steam_accounts"))
-                connection.commit()
-                logger.info("✅ Схема 'steam_accounts' создана/проверена")
-            
-            # Создаем все таблицы
-            Base.metadata.create_all(self.engine)
-            logger.info("✅ Таблицы в схеме 'steam_accounts' созданы/проверены")
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка создания схемы/таблиц: {e}")
-            raise
-
-    def _setup_engine(self):
-        """Настройка SQLAlchemy engine с пулом соединений."""
+    def _setup_engine(self) -> None:
+        """Configure SQLAlchemy engine and connection pool."""
         self.engine = create_engine(
             DB_CONNECTION_STRING,
             poolclass=QueuePool,
-            pool_size=2,          # Начальное количество соединений в пуле
-            max_overflow=5,      # Максимальное количество "дополнительных" соединений
-            pool_pre_ping=True,   # Проверять соединение перед использованием
-            pool_recycle=3600,    # Пересоздавать соединение каждые 3600 сек (1 час)
-            echo=False,           # Не логировать SQL-запросы в консоль
+            pool_size=2,
+            max_overflow=5,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            echo=False,
         )
 
-    def save_cookies(self, username: str, cookies: Dict[str, str]) -> bool:
-        session = self.Session()
+    def _create_schema_and_tables(self) -> None:
+        """Create schema and tables if they do not exist."""
         try:
-            # Ищем существующую запись
-            existing_record = session.query(SteamAccount).filter_by(username=username).first()
-            
-            if existing_record:
-                # Обновляем существующую запись
-                existing_record.cookies = json.dumps(cookies)
-                existing_record.update_time = datetime.now(timezone.utc)
-                logger.info(f"✅ Cookies для {username} обновлены в БД")
-            else:
-                # Создаем новую запись
-                new_record = SteamAccount(
-                    username=username,
-                    cookies=json.dumps(cookies),
-                    update_time=datetime.now(timezone.utc)
-                )
-                session.add(new_record)
-                logger.info(f"✅ Cookies для {username} созданы в БД")
-            
-            session.commit()
+            with self.engine.connect() as connection:
+                connection.execute(text("CREATE SCHEMA IF NOT EXISTS steam_accounts"))
+                connection.commit()
+                logger.info("Schema 'steam_accounts' verified.")
+            Base.metadata.create_all(self.engine)
+            logger.info("Tables in schema 'steam_accounts' verified.")
+        except Exception:
+            log_exception("Failed to create SQL schema or tables for cookie storage.")
+            raise
+
+    def save_cookies(self, username: str, cookies: Dict[str, str]) -> bool:
+        """Insert or update cookies for a specific account."""
+        try:
+            with self.Session() as session, session.begin():
+                existing_record = session.query(SteamAccount).filter_by(username=username).first()
+                if existing_record:
+                    existing_record.cookies = json.dumps(cookies)
+                    existing_record.update_time = datetime.now(timezone.utc)
+                else:
+                    session.add(
+                        SteamAccount(
+                            username=username,
+                            cookies=json.dumps(cookies),
+                            update_time=datetime.now(timezone.utc),
+                        )
+                    )
             return True
-        except Exception as e:
-            logger.error(f"Ошибка сохранения cookies в БД для {username}: {e}")
-            session.rollback()
+        except Exception:
+            log_exception(f"Failed to save cookies in SQL storage for '{username}'.")
             return False
-        finally:
-            session.close()
 
     def load_cookies(self, username: str) -> Optional[Dict[str, str]]:
-        session = self.Session()
+        """Load cookies for a specific account."""
         try:
-            record = session.query(SteamAccount).filter_by(username=username).first()
-            if record and record.cookies:
-                return json.loads(record.cookies)
+            with self.Session() as session:
+                record = session.query(SteamAccount).filter_by(username=username).first()
+                if record and record.cookies:
+                    return json.loads(record.cookies)
             return None
-        except Exception as e:
-            logger.error(f"Ошибка загрузки cookies из БД для {username}: {e}")
+        except Exception:
+            log_exception(f"Failed to load cookies from SQL storage for '{username}'.")
             return None
-        finally:
-            session.close()
 
     def delete_cookies(self, username: str) -> bool:
-        session = self.Session()
+        """Delete cookie row for a specific account."""
         try:
-            record = session.query(SteamAccount).filter_by(username=username).first()
-            if record:
-                session.delete(record)
-                session.commit()
+            with self.Session() as session, session.begin():
+                record = session.query(SteamAccount).filter_by(username=username).first()
+                if record:
+                    session.delete(record)
             return True
-        except Exception as e:
-            logger.error(f"Ошибка удаления cookies из БД для {username}: {e}")
-            session.rollback()
+        except Exception:
+            log_exception(f"Failed to delete cookies from SQL storage for '{username}'.")
             return False
-        finally:
-            session.close()
 
     def get_last_update(self, username: str) -> Optional[datetime]:
-        session = self.Session()
+        """Return last update timestamp for account cookies."""
         try:
-            record = session.query(SteamAccount).filter_by(username=username).first()
-            if record and record.update_time:
-                # Возвращаем время с timezone как есть
-                return record.update_time
+            with self.Session() as session:
+                record = session.query(SteamAccount).filter_by(username=username).first()
+                if record and record.update_time:
+                    return record.update_time
             return None
-        except Exception as e:
-            logger.error(f"Ошибка получения времени обновления из БД для {username}: {e}")
+        except Exception:
+            log_exception(f"Failed to read last update timestamp for '{username}'.")
             return None
-        finally:
-            session.close() 
 
 
-if __name__ == '__main__':
-    """Скрипт для создания схемы и таблиц в базе данных."""
-    import os
-    from pathlib import Path
-    from dotenv import load_dotenv
-    
-    # Загружаем .env файл
-    env_path = Path(__file__).parent / '.env'
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path)
-        db_connection = os.getenv("DB_CONNECTION_STRING")
-        
-        if db_connection:
-            print("🚀 Создание схемы и таблиц для cookie storage...")
-            try:
-                # Создаем engine
-                engine = create_engine(db_connection)
-                
-                # Создаем схему
-                with engine.connect() as connection:
-                    connection.execute(text("CREATE SCHEMA IF NOT EXISTS steam_accounts"))
-                    connection.commit()
-                    print("✅ Схема 'steam_accounts' создана/проверена")
-                
-                # Создаем таблицы
-                Base.metadata.create_all(engine)
-                print("✅ Таблицы в схеме 'steam_accounts' созданы/проверены")
-                print("🎉 Инициализация cookie storage завершена!")
-                
-            except Exception as e:
-                print(f"❌ Ошибка: {e}")
-        else:
-            print("❌ DB_CONNECTION_STRING не найден в .env файле")
+if __name__ == "__main__":
+    if not env_path.exists():
+        print(f"❌ Missing .env file at {env_path}")
+    elif not DB_CONNECTION_STRING:
+        print("❌ DB_CONNECTION_STRING is not set in .env")
     else:
-        print(f"❌ .env файл не найден по пути {env_path}")
+        try:
+            storage = SqlAlchemyCookieStorage()
+            print(f"✅ Cookie storage initialized: {storage.__class__.__name__}")
+        except Exception as error:
+            print(f"❌ Failed to initialize cookie storage: {error}")

@@ -32,7 +32,7 @@ from src.cli.account_context import AccountContext, build_account_context
 from src.cli.trade_handlers import (
     GiftAcceptHandler, SpecificTradeHandler
 )
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, log_exception
 from src.cookie_manager import initialize_cookie_manager
 
 
@@ -136,6 +136,7 @@ class SteamBotCLI:
                 return False
                 
         except Exception as e:
+            log_exception("Cookie update failed.")
             print(self.formatter.format_error("Ошибка обновления cookies (сессии)", e))
             return False
     
@@ -160,6 +161,7 @@ class SteamBotCLI:
                 return False
                 
         except Exception as e:
+            log_exception("Guard code generation failed.")
             print(self.formatter.format_error(Messages.GUARD_CODE_GENERATION_ERROR, e))
             return False
     
@@ -189,6 +191,7 @@ class SteamBotCLI:
                 return None
             
         except Exception as e:
+            log_exception("Failed to fetch active trades.")
             print(self.formatter.format_error("Ошибка при получении трейдов: ", e))
             return None
     
@@ -215,6 +218,7 @@ class SteamBotCLI:
                 return None
             
         except Exception as e:
+            log_exception("Failed to fetch trades list.")
             print(self.formatter.format_error("Ошибка при получении трейдов: ", e))
             return None
     
@@ -231,6 +235,7 @@ class SteamBotCLI:
         except KeyboardInterrupt:
             print(f"\n{Messages.INTERRUPTED}")
         except Exception as e:
+            log_exception("Critical CLI runtime error.")
             print(f"\n{Messages.CRITICAL_ERROR.format(error=e)}")
 
 

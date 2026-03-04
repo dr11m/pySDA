@@ -9,6 +9,12 @@ from pathlib import Path
 from time import time
 
 
+def _looks_like_file_path(value: str) -> bool:
+    """Return True when a string looks like a filesystem path."""
+    lowered = value.lower()
+    return "/" in value or "\\" in value or lowered.endswith((".mafile", ".json"))
+
+
 def load_steam_guard(steam_guard: str) -> dict[str, str]:
     """Load Steam Guard credentials from json (file or string).
 
@@ -18,11 +24,18 @@ def load_steam_guard(steam_guard: str) -> dict[str, str]:
     Returns:
         Dict[str, str]: Parsed json data as a dictionary of strings (both key and value).
     """
-    if Path(steam_guard).is_file():
-        with Path(steam_guard).open() as f:
+    guard_path = Path(steam_guard)
+    if guard_path.is_file():
+        with guard_path.open() as f:
             return json.loads(f.read(), parse_int=str)
-    else:
+    try:
         return json.loads(steam_guard, parse_int=str)
+    except json.JSONDecodeError as error:
+        if _looks_like_file_path(steam_guard):
+            raise FileNotFoundError(
+                f"Steam Guard file does not exist: {guard_path}"
+            ) from error
+        raise
 
 
 def generate_one_time_code(shared_secret: str, timestamp: int | None = None) -> str:
@@ -57,4 +70,3 @@ def generate_device_id(steam_id: str) -> str:
         hexed_steam_id[16:20],
         hexed_steam_id[20:32],
     ))
-
