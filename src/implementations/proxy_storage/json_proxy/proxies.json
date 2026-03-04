@@ -1,4 +1,6 @@
 {
-  "ebxa71178emhccr": "http://94.46.206.142:6915:azfghrproxytest1:87erR5wdfrR5wdf1",
-  "jeyRiyf42R": "no_proxy"
+  "your_steam_account_name_1": "http://user:password@host:port",
+  "your_steam_account_name_2": "https://host:port",
+  "account_without_proxy": "no_proxy",
+  "another_account_without_proxy": null
 }
