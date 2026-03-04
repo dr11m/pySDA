@@ -94,6 +94,15 @@ class ConfigManager:
             error_msg = f"Отсутствуют обязательные поля в конфигурации аккаунта: {', '.join(missing_fields)}"
             print(DisplayFormatter.format_error(error_msg))
             return False
+
+        mafile_path = self.active_account_config.get('mafile_path')
+        if mafile_path and not Path(mafile_path).is_file():
+            error_msg = (
+                f"Указанный mafile не найден: {mafile_path}. "
+                "Проверьте путь и регистр символов (важно на Linux)."
+            )
+            print(DisplayFormatter.format_error(error_msg))
+            return False
         
         return True
     

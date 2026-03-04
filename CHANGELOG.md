@@ -5,6 +5,25 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased] - Единая политика ошибок и traceback
+
+### Added
+- 🧩 **Единая точка логирования исключений**: Добавлен helper `log_exception(message: str)` в `src/utils/logger_setup.py`.
+- 📄 **Новый файл ошибок**: Добавлен отдельный sink `logs/error.log` для всех ошибок с traceback.
+- 🧪 **Новые тесты**:
+  - `tests/test_config_manager.py` для fail-fast проверки `mafile_path`;
+  - `tests/test_logger_setup.py` для проверки `log_exception()` и traceback в логе;
+  - `tests_steampy/test_guard.py` расширен кейсом отсутствующего файла.
+
+### Changed
+- 🖥️ **Traceback теперь всегда виден в консоли**: Добавлен обязательный error-sink в `stderr` с `backtrace=True`, `diagnose=False`.
+- 🛡️ **Унифицирована обработка исключений на границах**: В `account_context.py`, `factories.py`, `cookie_manager.py`, `trade_confirmation_manager.py`, `cli_interface.py`, `menu_base.py`, JSON/SQL cookie storage используется `log_exception(...)`.
+- 🚫 **Убраны ручные traceback-строки**: В целевых обработчиках удалено использование `traceback.format_exc()` и `exc_info=True` в пользу единого helper.
+- ✅ **Fail-fast валидация mafile**: `ConfigManager.validate_config()` теперь валидирует существование `mafile_path` до инициализации контекста.
+
+### Fixed
+- 📌 **Явная ошибка для несуществующего Steam Guard файла**: `load_steam_guard()` в `src/steampy/guard.py` теперь выбрасывает `FileNotFoundError` с понятным текстом, если передан путь к отсутствующему файлу.
+
 ## [3.1.4] - 11-10-2025 - Hotfix: Двойная проверка сессии и улучшенная валидация cookies
 
 ### Added

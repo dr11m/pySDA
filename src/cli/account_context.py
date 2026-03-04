@@ -12,7 +12,7 @@ from src.cli.cookie_checker import CookieChecker
 from src.cli.config_manager import ConfigManager
 from src.cli.display_formatter import DisplayFormatter
 from src.factories import create_instance_from_config
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, log_exception
 
 @dataclass
 class AccountContext:
@@ -104,6 +104,6 @@ def build_account_context(config_manager: ConfigManager, account_name: str) -> O
             config_manager=config_manager
         )
 
-    except Exception as e:
-        logger.error(f"❌ Не удалось создать контекст для '{account_name}': {e}", exc_info=True)
+    except Exception:
+        log_exception(f"Failed to build account context for '{account_name}'.")
         return None 

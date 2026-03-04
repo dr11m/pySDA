@@ -1,196 +1,180 @@
 #!/usr/bin/env python3
-"""
-Базовые классы для системы меню
-"""
+"""Base classes for the CLI menu system."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Callable, Optional, Any
 import sys
+from typing import Any, Callable, Dict, Optional
 
 from .constants import Formatting
+from src.utils.logger_setup import log_exception
 
 
 class MenuItem:
-    """Элемент меню"""
-    
+    """Single menu action entry."""
+
     def __init__(self, key: str, label: str, action: Callable[[], Any], enabled: bool = True):
         self.key = key
         self.label = label
         self.action = action
         self.enabled = enabled
-    
+
     def execute(self) -> Any:
-        """Выполнить действие элемента меню"""
+        """Execute menu action."""
         if not self.enabled:
             return None
         return self.action()
-    
+
     def __str__(self) -> str:
         return f"{self.key}. {self.label}"
 
 
 class BaseMenu(ABC):
-    """Базовый класс для меню"""
-    
+    """Base class for CLI menu screens."""
+
     def __init__(self, title: str):
         self.title = title
         self.items: Dict[str, MenuItem] = {}
         self.running = True
-    
+
     def add_item(self, item: MenuItem) -> None:
-        """Добавить элемент в меню"""
+        """Add a menu item."""
         self.items[item.key] = item
-    
+
     def remove_item(self, key: str) -> None:
-        """Удалить элемент из меню"""
+        """Remove a menu item by key."""
         if key in self.items:
             del self.items[key]
-    
+
     def get_item(self, key: str) -> Optional[MenuItem]:
-        """Получить элемент меню по ключу"""
+        """Get a menu item by key."""
         return self.items.get(key)
-    
+
     def display_header(self) -> None:
-        """Отобразить заголовок меню"""
+        """Render menu header."""
         print(f"\n{Formatting.SEPARATOR}")
         print(self.title)
         print(Formatting.SEPARATOR)
-    
+
     def display_items(self) -> None:
-        """Отобразить элементы меню"""
+        """Render all enabled menu items."""
         for item in self.items.values():
             if item.enabled:
                 print(item)
-    
+
     def display_footer(self) -> None:
-        """Отобразить подвал меню"""
+        """Render menu footer."""
         print(Formatting.LINE)
-    
+
     def display_menu(self) -> None:
-        """Отобразить полное меню"""
+        """Render full menu."""
         self.display_header()
         self.display_items()
         self.display_footer()
-        
-        # Принудительно отправляем вывод в терминал (для PowerShell)
         sys.stdout.flush()
-    
+
     def get_user_choice(self) -> str:
-        """Получить выбор пользователя"""
+        """Read user selection."""
         from .constants import Messages
+
         return input(Messages.CHOOSE_ACTION).strip()
-    
+
     def handle_choice(self, choice: str) -> bool:
-        """
-        Обработать выбор пользователя
-        
-        Returns:
-            bool: True если меню должно продолжить работу, False для выхода
-        """
+        """Handle user selection and return whether loop should continue."""
         item = self.get_item(choice)
         if item and item.enabled:
             try:
                 result = item.execute()
                 return self.process_action_result(choice, result)
-            except Exception as e:
-                self.handle_error(e)
+            except Exception as error:
+                self.handle_error(error)
                 return True
-        else:
-            self.handle_invalid_choice(choice)
-            return True
-    
+
+        self.handle_invalid_choice(choice)
+        return True
+
     def process_action_result(self, choice: str, result: Any) -> bool:
-        """
-        Обработать результат выполнения действия
-        
-        Args:
-            choice: Выбранный пункт меню
-            result: Результат выполнения действия
-            
-        Returns:
-            bool: True если меню должно продолжить работу
-        """
+        """Process action result and return whether loop should continue."""
         return True
-    
+
     def handle_invalid_choice(self, choice: str) -> None:
-        """Обработать неверный выбор"""
+        """Handle invalid user choice."""
         from .constants import Messages
+
         print(Messages.INVALID_CHOICE)
-    
+
     def handle_error(self, error: Exception) -> None:
-        """Обработать ошибку"""
+        """Handle unexpected action error."""
+        log_exception("Unhandled menu action error.")
         print(f"❌ Ошибка: {error}")
-    
+
     def should_pause(self) -> bool:
-        """Определить, нужна ли пауза после действия"""
+        """Return whether pause is needed after action."""
         return True
-    
+
     def pause(self) -> None:
-        """Пауза для чтения результата"""
+        """Pause for user acknowledgement."""
         if self.should_pause():
             from .constants import Messages
+
             input(f"\n{Messages.PRESS_ENTER}")
-    
+
     @abstractmethod
     def setup_menu(self) -> None:
-        """Настроить элементы меню (должно быть реализовано в наследниках)"""
-        pass
-    
+        """Configure menu items."""
+
     def run(self) -> None:
-        """Запустить меню"""
+        """Start menu loop."""
         self.setup_menu()
-        
+
         while self.running:
             self.display_menu()
             choice = self.get_user_choice()
-            
+
             if not self.handle_choice(choice):
                 break
-            
+
             self.pause()
-    
+
     def stop(self) -> None:
-        """Остановить меню"""
+        """Stop menu loop."""
         self.running = False
 
 
 class NavigableMenu(BaseMenu):
-    """Меню с возможностью навигации (возврат назад)"""
-    
+    """Menu with a back action."""
+
     def __init__(self, title: str, back_key: str = "0", back_label: str = "⬅️  Назад"):
         super().__init__(title)
         self.back_key = back_key
         self.back_label = back_label
-    
+
     def setup_menu(self) -> None:
-        """Базовая настройка - переопределяется в наследниках"""
-        pass
-    
+        """Configure menu items in child classes."""
+
     def run(self) -> None:
-        """Запустить меню с добавлением кнопки 'Назад' в конце"""
+        """Start menu loop and append back action."""
         self.setup_menu()
-        # Добавляем кнопку "Назад" в конец после всех остальных элементов
         self.add_item(MenuItem(self.back_key, self.back_label, self.go_back))
-        
+
         while self.running:
             self.display_menu()
             choice = self.get_user_choice()
-            
+
             if not self.handle_choice(choice):
                 break
-            
+
             self.pause()
-    
+
     def go_back(self) -> None:
-        """Вернуться назад"""
+        """Stop current menu and return."""
         self.stop()
-    
+
     def process_action_result(self, choice: str, result: Any) -> bool:
-        """Обработать результат с учетом навигации"""
+        """Handle navigation-specific action result."""
         if choice == self.back_key:
             return False
         return super().process_action_result(choice, result)
-    
+
     def should_pause(self) -> bool:
-        """Не делаем паузу при возврате назад"""
-        return True 
+        """Return whether pause is needed after action."""
+        return True

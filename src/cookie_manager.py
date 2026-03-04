@@ -5,16 +5,14 @@ Cookie Manager - Модуль для управления Steam cookies для �
 
 import os
 import time
-import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
-from src.utils.logger_setup import logger
+from src.utils.logger_setup import logger, print_and_log, log_exception
 from src.steampy.client import SteamClient
 from src.interfaces.storage_interface import CookieStorageInterface as StorageInterface
 from src.utils.delayed_http_adapter import DelayedHTTPAdapter
 from src.utils.cookies_and_session import session_to_dict
-from src.utils.logger_setup import print_and_log
 from src.cli.config_manager import global_config
 
 
@@ -87,6 +85,7 @@ class CookieManager:
             logger.info(f"Загружено {len(cookies_dict)} cookies в сессию")
             return True
         except Exception as e:
+            log_exception("Failed to load cookies into session.")
             logger.error(f"Ошибка загрузки cookies в сессию: {e}")
             return False
     
@@ -118,6 +117,7 @@ class CookieManager:
             logger.info("✅ Steam клиент создан")
             return steam_client
         except Exception as e:
+            log_exception("Failed to create Steam client.")
             logger.error(f"❌ Ошибка создания Steam клиента: {e}")
             return None
 
@@ -147,6 +147,7 @@ class CookieManager:
             
             return is_alive
         except Exception as e:
+            log_exception("Failed to check session status.")
             logger.error(f"❌ Ошибка проверки сессии: {e}")
             return False
     
@@ -185,6 +186,7 @@ class CookieManager:
                 return True
                 
             except Exception as e:
+                log_exception("Login attempt failed.")
                 logger.error(f"❌ Ошибка входа (попытка {attempt + 1}): {e}")
                 
                 # Упрощенная обработка ошибок без смены прокси
@@ -193,9 +195,6 @@ class CookieManager:
                     logger.warning("Проблема с соединением или прокси. Повторная попытка через некоторое время...")
                     time.sleep(5) # Пауза перед следующей попыткой
                 
-                if attempt == max_retries - 1:
-                    logger.debug(traceback.format_exc())
-        
         logger.error(f"❌ Все попытки входа исчерпаны ({max_retries})")
         return False
     
@@ -295,8 +294,8 @@ class CookieManager:
             return cookies
             
         except Exception as e:
+            log_exception("Cookie update failed.")
             logger.error(f"❌ Ошибка обновления cookies: {e}")
-            logger.debug(traceback.format_exc())
             return None
     
     def get_cookies(self, auto_update: bool = True) -> Optional[Dict[str, str]]:
@@ -369,6 +368,7 @@ class CookieManager:
                         logger.error("❌ Не удалось выполнить вход")
                         return None
             except Exception as e:
+                log_exception("Session validation failed before returning Steam client.")
                 logger.error(f"❌ Ошибка проверки сессии: {e}")
                 # Пробуем выполнить вход в случае ошибки
                 try:
@@ -376,6 +376,7 @@ class CookieManager:
                         logger.error("❌ Не удалось выполнить вход после ошибки")
                         return None
                 except Exception as login_error:
+                    log_exception("Critical login flow failure.")
                     logger.error(f"❌ Критическая ошибка входа: {login_error}")
                     return None
         
