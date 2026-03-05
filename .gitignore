@@ -194,3 +194,5 @@ debug_*.json
 debug_*.txt
 debug_info/*
 CLAUDE.md
+src/implementations/proxy_storage/json_proxy/proxies.json
+!accounts_info/acc_name_example.mafile

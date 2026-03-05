@@ -5,7 +5,7 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
-## [Unreleased] - Единая политика ошибок и traceback
+## [3.1.5] 05-03-2026 - Единая политика ошибок и traceback
 
 ### Added
 - 🧩 **Единая точка логирования исключений**: Добавлен helper `log_exception(message: str)` в `src/utils/logger_setup.py`.
