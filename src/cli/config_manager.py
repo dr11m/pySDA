@@ -96,13 +96,37 @@ class ConfigManager:
             return False
 
         mafile_path = self.active_account_config.get('mafile_path')
-        if mafile_path and not Path(mafile_path).is_file():
-            error_msg = (
-                f"Указанный mafile не найден: {mafile_path}. "
-                "Проверьте путь и регистр символов (важно на Linux)."
-            )
-            print(DisplayFormatter.format_error(error_msg))
-            return False
+        if mafile_path:
+            path = Path(mafile_path)
+            parent = path.parent
+            if parent.is_dir():
+                filename_lower = path.name.lower()
+                try:
+                    matching_files = [
+                        f for f in parent.iterdir()
+                        if f.is_file() and f.name.lower() == filename_lower
+                    ]
+                    if matching_files:
+                        actual_file = matching_files[0]
+                        if actual_file.name != path.name:
+                            warning_msg = (
+                                f"Регистр символов в имени mafile не совпадает: "
+                                f"в конфигурации '{path.name}', а на диске '{actual_file.name}'. "
+                                f"Автоматически используется '{actual_file.name}'."
+                            )
+                            print(DisplayFormatter.format_warning(warning_msg))
+                            self.active_account_config['mafile_path'] = str(actual_file.as_posix())
+                            path = actual_file
+                except Exception as e:
+                    logger.warning(f"Ошибка при поиске файла без учета регистра: {e}")
+
+            if not path.is_file():
+                error_msg = (
+                    f"Указанный mafile не найден: {mafile_path}. "
+                    "Проверьте путь и регистр символов (важно на Linux)."
+                )
+                print(DisplayFormatter.format_error(error_msg))
+                return False
         
         return True
     
