@@ -184,6 +184,7 @@ accounts_info/*
 config.yaml
 logs/*
 browser_profiles/
+browser_launcher/bundled_extensions/simple-proxy-switcher/
 debug_apikey_page.html
 
 # Steam session files (содержат чувствительные данные)

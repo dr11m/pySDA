@@ -5,10 +5,11 @@ from typing import Any, Dict, List
 from loguru import logger
 
 from browser_launcher.cookie_reader import load_playwright_cookies
+from browser_launcher.extensions import build_extension_launch_args, get_default_extension_path
 from browser_launcher.models import AccountSettings, LaunchOptions
 from browser_launcher.profile_store import ProfileStore
 from browser_launcher.proxy_format import format_proxy_label
-from browser_launcher.proxy_utils import resolve_account_proxy, to_playwright_proxy
+from browser_launcher.proxy_utils import to_playwright_proxy
 from browser_launcher.session_check import context_has_steam_session
 from browser_launcher.session_lock import SessionLock
 
@@ -29,10 +30,7 @@ class BrowserLauncher:
         """Open a persistent Chromium window for the given account."""
         from playwright.sync_api import sync_playwright
 
-        proxy_mapping = resolve_account_proxy(
-            account.proxy_provider_config,
-            account.account_name,
-        )
+        proxy_mapping = options.proxy_mapping
         playwright_proxy = to_playwright_proxy(proxy_mapping)
         proxy_label = format_proxy_label(proxy_mapping)
         profile_dir = self.profile_store.get_profile_dir(account.account_name)
@@ -60,12 +58,18 @@ class BrowserLauncher:
 
         try:
             with sync_playwright() as playwright:
+                chromium_args = ["--disable-blink-features=AutomationControlled"]
+                extension_path = get_default_extension_path()
+                if extension_path is not None:
+                    chromium_args.extend(build_extension_launch_args(extension_path))
+                    logger.info("Loaded extension from {}", extension_path)
+
                 context = playwright.chromium.launch_persistent_context(
                     user_data_dir=str(profile_dir),
                     headless=False,
                     proxy=playwright_proxy,
                     no_viewport=True,
-                    args=["--disable-blink-features=AutomationControlled"],
+                    args=chromium_args,
                 )
                 context.set_default_timeout(BROWSER_TIMEOUT_MS)
                 context.set_default_navigation_timeout(BROWSER_TIMEOUT_MS)
