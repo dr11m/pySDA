@@ -23,14 +23,14 @@ from src.cli.constants import MenuChoice, Messages
 from src.cli.display_formatter import DisplayFormatter
 from src.cli.config_manager import ConfigManager
 from src.cli.cookie_checker import CookieChecker
-from src.cli.menus import MainMenu, TradesMenu, AutoMenu
+from src.cli.menus import AutoMenu, MainMenu
 from src.cli.menus import SettingsMenu
 from src.cli.menu_base import BaseMenu, NavigableMenu, MenuItem
 from src.models import TradeOffer
 from src.trade_confirmation_manager import TradeConfirmationManager
 from src.cli.account_context import AccountContext, build_account_context
 from src.cli.trade_handlers import (
-    GiftAcceptHandler, SpecificTradeHandler
+    GiftAcceptHandler, MarketListHandler, SpecificTradeHandler
 )
 from src.utils.logger_setup import logger, log_exception
 from src.cookie_manager import initialize_cookie_manager
