@@ -6,6 +6,7 @@ requires-python = ">=3.10.8"
 name = "aenum"
 version = "3.1.16"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/7a/61ed58e8be9e30c3fe518899cc78c284896d246d51381bab59b5db11e1f3/aenum-3.1.16.tar.gz", hash = "sha256:bfaf9589bdb418ee3a986d85750c7318d9d2839c1b1a1d6fe8fc53ec201cf140", size = 137693 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/52/6ad8f63ec8da1bf40f96996d25d5b650fdd38f5975f8c813732c47388f18/aenum-3.1.16-py3-none-any.whl", hash = "sha256:9035092855a98e41b66e3d0998bd7b96280e85ceb3a04cc035636138a1943eaf", size = 165627 },
 ]
@@ -739,7 +740,7 @@ wheels = [
 
 [[package]]
 name = "pysda"
-version = "3.1.1"
+version = "3.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "aenum" },
