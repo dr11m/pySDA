@@ -221,5 +221,5 @@ class SteamMarket:
         return response
 
     def _confirm_sell_listing(self, asset_id: str) -> dict:
-        return con_executor.confirm_sell_listing(asset_id)
+        return self.con_executor.confirm_sell_listing(asset_id)
 
