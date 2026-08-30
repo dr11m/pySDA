@@ -84,9 +84,8 @@ class CookieManager:
             session.cookies.update(cookies_dict)
             logger.info(f"Загружено {len(cookies_dict)} cookies в сессию")
             return True
-        except Exception as e:
+        except Exception:
             log_exception("Failed to load cookies into session.")
-            logger.error(f"Ошибка загрузки cookies в сессию: {e}")
             return False
     
     def _create_steam_client(self) -> Optional[SteamClient]:
@@ -116,9 +115,8 @@ class CookieManager:
             
             logger.info("✅ Steam клиент создан")
             return steam_client
-        except Exception as e:
-            log_exception("Failed to create Steam client.")
-            logger.error(f"❌ Ошибка создания Steam клиента: {e}")
+        except Exception:
+            log_exception(f"Failed to create Steam client for '{self.username}'.")
             return None
 
     def _enforce_direct_connection(self, session) -> None:
@@ -146,9 +144,8 @@ class CookieManager:
                 logger.info("❌ Сессия неактивна")
             
             return is_alive
-        except Exception as e:
-            log_exception("Failed to check session status.")
-            logger.error(f"❌ Ошибка проверки сессии: {e}")
+        except Exception:
+            log_exception(f"Failed to check session status for '{self.username}'.")
             return False
     
     def _login_and_save_session(self) -> bool:
@@ -185,12 +182,13 @@ class CookieManager:
                 logger.info("✅ Успешный вход и сохранение сессии")
                 return True
                 
-            except Exception as e:
-                log_exception("Login attempt failed.")
-                logger.error(f"❌ Ошибка входа (попытка {attempt + 1}): {e}")
-                
+            except Exception as error:
+                log_exception(
+                    f"Login attempt {attempt + 1}/{max_retries} failed for '{self.username}'."
+                )
+
                 # Упрощенная обработка ошибок без смены прокси
-                error_str = str(e).lower()
+                error_str = str(error).lower()
                 if any(keyword in error_str for keyword in ['429', 'too many requests', 'proxy', 'connection']):
                     logger.warning("Проблема с соединением или прокси. Повторная попытка через некоторое время...")
                     time.sleep(5) # Пауза перед следующей попыткой
@@ -293,9 +291,8 @@ class CookieManager:
             
             return cookies
             
-        except Exception as e:
-            log_exception("Cookie update failed.")
-            logger.error(f"❌ Ошибка обновления cookies: {e}")
+        except Exception:
+            log_exception(f"Cookie update failed for '{self.username}'.")
             return None
     
     def get_cookies(self, auto_update: bool = True) -> Optional[Dict[str, str]]:
@@ -367,17 +364,17 @@ class CookieManager:
                     if not self._login_and_save_session():
                         logger.error("❌ Не удалось выполнить вход")
                         return None
-            except Exception as e:
-                log_exception("Session validation failed before returning Steam client.")
-                logger.error(f"❌ Ошибка проверки сессии: {e}")
+            except Exception:
+                log_exception(
+                    f"Session validation failed before returning Steam client for '{self.username}'."
+                )
                 # Пробуем выполнить вход в случае ошибки
                 try:
                     if not self._login_and_save_session():
                         logger.error("❌ Не удалось выполнить вход после ошибки")
                         return None
-                except Exception as login_error:
-                    log_exception("Critical login flow failure.")
-                    logger.error(f"❌ Критическая ошибка входа: {login_error}")
+                except Exception:
+                    log_exception(f"Critical login flow failure for '{self.username}'.")
                     return None
         
         # Показываем cookies в возвращаемом клиенте
