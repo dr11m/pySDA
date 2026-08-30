@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 from loguru import logger
 
 from browser_launcher.cookie_reader import load_playwright_cookies
-from browser_launcher.extensions import build_extension_launch_args, get_default_extension_path
 from browser_launcher.models import AccountSettings, LaunchOptions
 from browser_launcher.profile_store import ProfileStore
 from browser_launcher.proxy_format import format_proxy_label
@@ -58,18 +57,12 @@ class BrowserLauncher:
 
         try:
             with sync_playwright() as playwright:
-                chromium_args = ["--disable-blink-features=AutomationControlled"]
-                extension_path = get_default_extension_path()
-                if extension_path is not None:
-                    chromium_args.extend(build_extension_launch_args(extension_path))
-                    logger.info("Loaded extension from {}", extension_path)
-
                 context = playwright.chromium.launch_persistent_context(
                     user_data_dir=str(profile_dir),
                     headless=False,
                     proxy=playwright_proxy,
                     no_viewport=True,
-                    args=chromium_args,
+                    args=["--disable-blink-features=AutomationControlled"],
                 )
                 context.set_default_timeout(BROWSER_TIMEOUT_MS)
                 context.set_default_navigation_timeout(BROWSER_TIMEOUT_MS)
