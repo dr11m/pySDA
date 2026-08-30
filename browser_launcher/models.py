@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -24,3 +24,4 @@ class LaunchOptions:
     config_path: Path
     profile_root: Path
     refresh_cookies: bool
+    proxy_mapping: Optional[Dict[str, str]] = None

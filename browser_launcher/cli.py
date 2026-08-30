@@ -16,6 +16,7 @@ from browser_launcher.menu import (
 )
 from browser_launcher.models import LaunchOptions
 from browser_launcher.profile_store import ProfileStore
+from browser_launcher.proxy_menu import select_proxy_mapping
 
 
 DEFAULT_START_URL = "https://steamcommunity.com/"
@@ -103,12 +104,17 @@ def _run_interactive_menu(args: argparse.Namespace) -> None:
             print(f"Account '{selected_item.account_name}' is not configured correctly.")
             continue
 
+        proxy_selection = select_proxy_mapping(settings)
+        if proxy_selection.cancelled:
+            continue
+
         options = LaunchOptions(
             account_name=selected_item.account_name,
             start_url=args.url,
             config_path=Path(args.config),
             profile_root=profile_store.root_dir,
             refresh_cookies=args.refresh_cookies,
+            proxy_mapping=proxy_selection.proxy_mapping,
         )
         launcher.open_account(settings, options)
         print(f"Browser for '{selected_item.account_name}' was closed.")
