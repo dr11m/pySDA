@@ -33,9 +33,8 @@ class TradeConfirmationManager:
         try:
             self.steam_guard_data = load_steam_guard(mafile_path)
             logger.info(f"✅ Steam Guard данные загружены для {username}")
-        except Exception as e:
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка загрузки Steam Guard данных: {e}")
+        except Exception:
+            log_exception(f"Failed to load Steam Guard data for '{username}' from '{mafile_path}'.")
             raise
         
         logger.info(f"🔄 Trade Confirmation Manager инициализирован для {username}")
@@ -58,9 +57,8 @@ class TradeConfirmationManager:
             
             code = generate_one_time_code(shared_secret)
             return code
-        except Exception as e:
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка генерации Guard кода: {e}")
+        except Exception:
+            log_exception(f"Failed to generate Guard code for '{self.username}'.")
             raise
     
     def get_trade_offers(self, active_only: bool = True, use_webtoken: bool = True) -> Optional[TradeOffersResponse]:
@@ -93,9 +91,8 @@ class TradeConfirmationManager:
                         else:
                             logger.error("Не удалось получить API ключ")
                             return None
-                    except Exception as e:
-                        log_exception("Unhandled exception in TradeConfirmationManager.")
-                        logger.error(f"Ошибка получения API ключа: {e}")
+                    except Exception:
+                        log_exception(f"Failed to fetch API key for '{self.username}'.")
                         return None
             else:
                 logger.info("🔑 Используем access_token из cookies (webtoken)")
@@ -142,10 +139,8 @@ class TradeConfirmationManager:
             
             return trade_offers
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка получения трейд офферов: {e}")
+        except Exception:
+            log_exception(f"Failed to fetch trade offers for '{self.username}'.")
             return None
     
     def _get_api_key_from_web(self, steam_client: SteamClient) -> Optional[str]:
@@ -198,10 +193,8 @@ class TradeConfirmationManager:
                     logger.warning("Не удалось найти API ключ на странице")
                     return None
                     
-        except Exception as e:
-                    
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"Ошибка получения API ключа через веб: {e}")
+        except Exception:
+            log_exception(f"Failed to fetch API key via web for '{self.username}'.")
             return None
     
     def _create_api_key(self, steam_client: SteamClient) -> Optional[str]:
@@ -249,10 +242,8 @@ class TradeConfirmationManager:
                 logger.error(f"Ошибка создания API ключа: {create_response.status_code}")
                 return None
                 
-        except Exception as e:
-                
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"Ошибка создания API ключа: {e}")
+        except Exception:
+            log_exception(f"Failed to create API key for '{self.username}'.")
             return None
 
     def _get_access_token(self, steam_client: SteamClient) -> Optional[str]:
@@ -301,10 +292,8 @@ class TradeConfirmationManager:
             logger.info(f"✅ Access token извлечен: {access_token[:15]}...")
             return access_token
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка извлечения access_token: {e}")
+        except Exception:
+            log_exception(f"Failed to extract access_token for '{self.username}'.")
             return None
     
     def get_confirmations(self) -> List[Dict[str, Any]]:
@@ -353,10 +342,8 @@ class TradeConfirmationManager:
                 print_and_log("ℹ️ Подтверждений не найдено")
                 return []
                 
-        except Exception as e:
-                
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка получения подтверждений: {e}")
+        except Exception:
+            log_exception(f"Failed to fetch mobile confirmations for '{self.username}'.")
             return []
     
     def get_guard_confirmations(self) -> List[Dict[str, Any]]:
@@ -428,10 +415,11 @@ class TradeConfirmationManager:
                     
                     logger.info(f"  {i}. {confirmation_type} - {detailed_conf['description']} (ID: {conf_data['id']})")
                     
-                except Exception as e:
-                    
-                    log_exception("Unhandled exception in TradeConfirmationManager.")
-                    logger.warning(f"⚠️ Ошибка обработки подтверждения {conf_data.get('id', 'unknown')}: {e}")
+                except Exception:
+                    log_exception(
+                        f"Failed to process Guard confirmation "
+                        f"{conf_data.get('id', 'unknown')} for '{self.username}'."
+                    )
                     # Добавляем базовую информацию даже при ошибке
                     detailed_conf = {
                         'id': conf_data.get('id', 'unknown'),
@@ -446,10 +434,8 @@ class TradeConfirmationManager:
             
             return detailed_confirmations
                 
-        except Exception as e:
-                
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка получения подтверждений Guard: {e}")
+        except Exception:
+            log_exception(f"Failed to fetch Guard confirmations for '{self.username}'.")
             return []
     
     def _determine_confirmation_type(self, details_html: str) -> str:
@@ -489,10 +475,11 @@ class TradeConfirmationManager:
                 logger.error(f"❌ Ошибка подтверждения {confirmation_obj.data_confid}: {error_message}")
                 return False
                 
-        except Exception as e:
-                
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка подтверждения Guard: {e}")
+        except Exception:
+            log_exception(
+                f"Failed to confirm Guard confirmation "
+                f"{confirmation_obj.data_confid} for '{self.username}'."
+            )
             return False
     
     def accept_trade_offer(self, trade_offer_id: str, partner_account_id: str = None) -> bool:
@@ -525,10 +512,10 @@ class TradeConfirmationManager:
                 # Даже если ответ неожиданный, считаем что трейд принят если нет явной ошибки
                 return True
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"Ошибка принятия трейд оффера {trade_offer_id} в веб-интерфейсе: {e}")
+        except Exception:
+            log_exception(
+                f"Failed to accept trade offer {trade_offer_id} in web UI for '{self.username}'."
+            )
             return False
 
     def accept_trade_offer_with_confirmation(self, trade_offer_id: str) -> bool:
@@ -551,10 +538,10 @@ class TradeConfirmationManager:
                 logger.warning(f"Неожиданный ответ: {result}")
                 return True
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"Ошибка принятия трейд оффера {trade_offer_id} с подтверждением: {e}")
+        except Exception:
+            log_exception(
+                f"Failed to accept trade offer {trade_offer_id} with confirmation for '{self.username}'."
+            )
             return False
 
     def confirm_accepted_trade_offer(self, trade_offer_id: str) -> bool:
@@ -575,10 +562,10 @@ class TradeConfirmationManager:
                 logger.error(f"❌ Не удалось подтвердить трейд оффер {trade_offer_id} через Guard: {error_msg}")
                 return False
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка подтверждения трейда {trade_offer_id} через Guard: {e}")
+        except Exception:
+            log_exception(
+                f"Failed to confirm trade offer {trade_offer_id} via Guard for '{self.username}'."
+            )
             return False
     
     def decline_trade_offer(self, trade_offer_id: str) -> bool:
@@ -598,10 +585,8 @@ class TradeConfirmationManager:
             
             return result
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка отклонения трейд оффера {trade_offer_id}: {e}")
+        except Exception:
+            log_exception(f"Failed to decline trade offer {trade_offer_id} for '{self.username}'.")
             return False
     
     def process_free_trades(self, auto_accept: bool = True, auto_confirm: bool = True) -> Dict[str, int]:
@@ -680,10 +665,10 @@ class TradeConfirmationManager:
                     else:
                         logger.info(f"ℹ️ Бесплатный трейд найден, но auto_accept отключен: {offer.tradeofferid}")
                         
-                except Exception as e:
-                        
-                    log_exception("Unhandled exception in TradeConfirmationManager.")
-                    logger.error(f"❌ Ошибка обработки трейда {offer.tradeofferid}: {e}")
+                except Exception:
+                    log_exception(
+                        f"Failed to process free trade {offer.tradeofferid} for '{self.username}'."
+                    )
                     stats['errors'] += 1
             
             # Итоговая статистика
@@ -695,10 +680,8 @@ class TradeConfirmationManager:
             
             return stats
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка обработки бесплатных трейдов: {e}")
+        except Exception:
+            log_exception(f"Failed to process free trades for '{self.username}'.")
             stats['errors'] += 1
             return stats
     
@@ -760,10 +743,11 @@ class TradeConfirmationManager:
                     else:
                         logger.info(f"ℹ️ Трейд требует подтверждения, но auto_confirm отключен: {offer.tradeofferid}")
                         
-                except Exception as e:
-                        
-                    log_exception("Unhandled exception in TradeConfirmationManager.")
-                    logger.error(f"❌ Ошибка обработки трейда {offer.tradeofferid}: {e}")
+                except Exception:
+                    log_exception(
+                        f"Failed to process confirmation-needed trade "
+                        f"{offer.tradeofferid} for '{self.username}'."
+                    )
                     stats['errors'] += 1
             
             # Итоговая статистика
@@ -774,9 +758,7 @@ class TradeConfirmationManager:
             
             return stats
             
-        except Exception as e:
-            
-            log_exception("Unhandled exception in TradeConfirmationManager.")
-            logger.error(f"❌ Ошибка обработки трейдов, требующих подтверждения: {e}")
+        except Exception:
+            log_exception(f"Failed to process confirmation-needed trades for '{self.username}'.")
             stats['errors'] += 1
             return stats 

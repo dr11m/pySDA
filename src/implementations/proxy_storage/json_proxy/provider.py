@@ -1,49 +1,59 @@
+"""JSON file-based proxy provider for per-account proxy configuration."""
+
 import json
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
 from src.interfaces.proxy_provider import ProxyProviderInterface
 
+PROXIES_FILE = Path(__file__).parent / "proxies.json"
+
 
 class JsonProxyProvider(ProxyProviderInterface):
+    """Load account proxy mappings from a local JSON file."""
+
     def __init__(self, **kwargs):
-        # Всегда используем фиксированный путь для этой реализации
-        self.json_path = Path('src/implementations/json_proxy/proxies.json')
+        self.json_path = PROXIES_FILE
         self._proxies = self._load_proxies()
 
     def _load_proxies(self) -> Dict[str, str]:
+        """Load proxy mappings from the configured JSON file."""
         if not self.json_path.exists():
             return {}
-        with open(self.json_path, 'r') as f:
-            return json.load(f)
+        with open(self.json_path, "r", encoding="utf-8") as file:
+            return json.load(file)
 
     def get_proxy(self, account_name: str) -> Optional[Dict[str, str]]:
+        """Return requests-compatible proxy settings for an account."""
         proxy_url = self._proxies.get(account_name)
 
-        if not proxy_url or proxy_url.lower() == 'no_proxy':
+        if not proxy_url or str(proxy_url).lower() == "no_proxy":
             return None
 
-        # Конвертируем формат host:port:username:password в username:password@host:port
-        if ':' in proxy_url and proxy_url.count(':') >= 3:
-            # Парсим формат "http://host:port:username:password"
-            if proxy_url.startswith('http://'):
-                proxy_url = proxy_url[7:]  # убираем http://
-            
-            parts = proxy_url.split(':')
+        proxy_url = str(proxy_url)
+
+        if "@" not in proxy_url and ":" in proxy_url and proxy_url.count(":") >= 3:
+            stripped = proxy_url
+            if proxy_url.startswith("http://"):
+                stripped = proxy_url[7:]
+            elif proxy_url.startswith("https://"):
+                stripped = proxy_url[8:]
+
+            parts = stripped.split(":")
             if len(parts) >= 4:
                 host = parts[0]
                 port = parts[1]
                 username = parts[2]
                 password = parts[3]
-                formatted_proxy = f"http://{username}:{password}@{host}:{port}"
-                
+                scheme = "https" if proxy_url.startswith("https://") else "http"
+                formatted_proxy = f"{scheme}://{username}:{password}@{host}:{port}"
+
                 return {
-                    'http': formatted_proxy,
-                    'https': formatted_proxy
+                    "http": formatted_proxy,
+                    "https": formatted_proxy,
                 }
 
-        # Если уже в правильном формате, используем как есть
         return {
-            'http': proxy_url,
-            'https': proxy_url
-        } 
+            "http": proxy_url,
+            "https": proxy_url,
+        }
