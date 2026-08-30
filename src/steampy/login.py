@@ -44,9 +44,10 @@ class LoginExecutor:
     def login(self) -> tuple[Session, str]:
         try:
             login_response = self._send_login_request()
+            logger.debug(f"BeginAuthSessionViaCredentials response for {self.username}: {login_response.json()}")
             if not login_response.json()['response']:
                 raise ApiException('No response received from Steam API. Please try again later.')
-            
+
             self._check_for_captcha(login_response)
             
             self._update_steam_guard(login_response)
@@ -131,7 +132,7 @@ class LoginExecutor:
             else:
                 raise Exception('Cannot update Steam guard')
         except Exception as e:
-            print(f"❌ Ошибка в _update_steam_guard: {e}")
+            logger.error(f"❌ Ошибка в _update_steam_guard для {self.username}: {e} | Steam response: {login_response.json()}")
             raise
 
     def _pool_sessions_steam(self, client_id: str, request_id: str) -> None:
