@@ -275,8 +275,16 @@ class CookieManager:
                     self.storage.save_cookies(self.username, self.cookies_cache)
                     return self.cookies_cache
 
-            self.steam_client.login_if_need_to()
-            
+            print_and_log(f"🔄 Refreshing Steam session for {self.username}")
+            self.steam_client.update_session()
+            if not self.steam_client.check_session_static(
+                self.username, self.steam_client._session
+            ):
+                logger.error(
+                    f"Session still invalid after refresh for {self.username}"
+                )
+                return None
+
             # Получаем cookies из сессии
             cookies = session_to_dict(self.steam_client._session)
             if not cookies:

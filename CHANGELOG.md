@@ -9,7 +9,7 @@
 
 ### Changed
 - 🔍 **Проверка сессии**: `check_session_static()` больше не ищет username на главной Steam Community. Живость cookies определяется запросом `GET https://steamcommunity.com/market/mylistings?start=0&count=100` (HTTP 200 без редиректа на login).
-- 🧹 **Один зонд вместо двух**: при обновлении cookies убрана дополнительная проверка через trade offer URL. Если `mylistings` отвечает 400, сессия считается мёртвой и идёт refresh/login.
+- 🧹 **Один зонд вместо двух**: при обновлении cookies убрана дополнительная проверка через trade offer URL. Если `mylistings` не даёт HTTP 200 без login-редиректа, вызывается `update_session()`; старые cookies не сохраняются, пока повторный зонд не станет зелёным.
 
 ### Fixed
 - 🐛 **Ложно живые cookies для маркета**: homepage и trade URL могли быть зелёными, пока потребители cookies получали `HTTP 400` на `market/mylistings`. Теперь тот же endpoint решает, отдавать ли cookies как valid.
