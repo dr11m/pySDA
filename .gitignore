@@ -198,4 +198,9 @@ CLAUDE.md
 .agents/
 src/implementations/proxy_storage/json_proxy/proxies.json
 !accounts_info/acc_name_example.mafile
+<<<<<<< Updated upstream
+=======
+.agents/*
+browser_profiles/*
+>>>>>>> Stashed changes
 skills-lock.json
