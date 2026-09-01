@@ -18,7 +18,6 @@ from browser_launcher.models import LaunchOptions
 from browser_launcher.profile_store import ProfileStore
 from browser_launcher.proxy_menu import select_proxy_mapping
 
-
 DEFAULT_START_URL = "https://steamcommunity.com/"
 
 
@@ -35,7 +34,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--url",
-        default=DEFAULT_START_URL,
+        default=None,
         help=f"Start URL (default: {DEFAULT_START_URL})",
     )
     parser.add_argument(
@@ -64,7 +63,9 @@ def _run_interactive_menu(args: argparse.Namespace) -> None:
     """Show account menu and launch browser for the selected account."""
     reader = _load_reader(args.config)
     profile_root = Path(args.profile_root) if args.profile_root else None
-    profile_store = ProfileStore(root_dir=profile_root) if profile_root else ProfileStore()
+    profile_store = (
+        ProfileStore(root_dir=profile_root) if profile_root else ProfileStore()
+    )
     launcher = BrowserLauncher(profile_store=profile_store)
 
     while True:
@@ -101,20 +102,32 @@ def _run_interactive_menu(args: argparse.Namespace) -> None:
 
         settings = reader.get_account_settings(selected_item.account_name)
         if settings is None:
-            print(f"Account '{selected_item.account_name}' is not configured correctly.")
+            print(
+                f"Account '{selected_item.account_name}' is not configured correctly."
+            )
             continue
 
         proxy_selection = select_proxy_mapping(settings)
         if proxy_selection.cancelled:
             continue
 
+        if args.url:
+            start_url = args.url
+            verify_steam_session = False
+        else:
+            start_url = DEFAULT_START_URL
+            verify_steam_session = True
+
         options = LaunchOptions(
             account_name=selected_item.account_name,
-            start_url=args.url,
+            start_url=start_url,
             config_path=Path(args.config),
             profile_root=profile_store.root_dir,
             refresh_cookies=args.refresh_cookies,
             proxy_mapping=proxy_selection.proxy_mapping,
+            verify_steam_session=verify_steam_session,
+            seed_cookies=True,
+            bypass_cs_deals=proxy_selection.bypass_cs_deals,
         )
         launcher.open_account(settings, options)
         print(f"Browser for '{selected_item.account_name}' was closed.")

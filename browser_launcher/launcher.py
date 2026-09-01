@@ -30,7 +30,10 @@ class BrowserLauncher:
         from playwright.sync_api import sync_playwright
 
         proxy_mapping = options.proxy_mapping
-        playwright_proxy = to_playwright_proxy(proxy_mapping)
+        playwright_proxy = to_playwright_proxy(
+            proxy_mapping,
+            bypass_cs_deals=options.bypass_cs_deals,
+        )
         proxy_label = format_proxy_label(proxy_mapping)
         profile_dir = self.profile_store.get_profile_dir(account.account_name)
         session_lock = SessionLock(profile_dir, account.account_name)
@@ -52,6 +55,9 @@ class BrowserLauncher:
         print(f"Proxy IP: {proxy_label}")
         if playwright_proxy:
             logger.info("Proxy endpoint: {}", proxy_label)
+            if options.bypass_cs_deals:
+                logger.info("cs.deals bypasses the proxy and uses a direct connection")
+                print("Routing: Steam via proxy, cs.deals direct")
         else:
             logger.warning("No proxy configured for account '{}'", account.account_name)
 
@@ -68,13 +74,15 @@ class BrowserLauncher:
                 context.set_default_navigation_timeout(BROWSER_TIMEOUT_MS)
 
                 page = context.pages[0] if context.pages else context.new_page()
-                self._ensure_steam_session(
+                self._prepare_browser_session(
                     context=context,
                     page=page,
                     cookies=cookies,
                     account_name=account.account_name,
                     username=account.username,
                     start_url=options.start_url,
+                    verify_steam_session=options.verify_steam_session,
+                    seed_cookies=options.seed_cookies,
                     force_refresh=options.refresh_cookies,
                 )
                 logger.info("Close the browser window to return to account menu")
@@ -83,32 +91,40 @@ class BrowserLauncher:
         finally:
             session_lock.release()
 
-    def _ensure_steam_session(
+    def _prepare_browser_session(
         self,
         context: Any,
         page: Any,
         cookies: List[Dict[str, Any]],
         account_name: str,
         username: str,
-        start_url: str,
+        start_url: str | None,
+        verify_steam_session: bool,
+        seed_cookies: bool,
         force_refresh: bool,
     ) -> None:
-        """Seed cookies when needed and verify Steam login state."""
-        should_seed_before_navigation = bool(
-            cookies
-            and (
-                force_refresh
-                or not self.profile_store.has_verified_session(account_name)
+        """Seed cookies and open a start URL according to the selected mode."""
+        if seed_cookies:
+            should_seed = bool(
+                cookies
+                and (
+                    force_refresh
+                    or not self.profile_store.has_verified_session(account_name)
+                )
             )
-        )
+            if should_seed:
+                self._seed_cookies(context, cookies)
+                logger.info("Seeded {} cookies from storage", len(cookies))
+            elif not cookies:
+                logger.warning(
+                    "No cookies found in storage for username '{}'", username
+                )
 
-        if should_seed_before_navigation:
-            self._seed_cookies(context, cookies)
-            logger.info("Seeded {} cookies from storage", len(cookies))
-        elif not cookies:
-            logger.warning("No cookies found in storage for username '{}'", username)
+        if start_url:
+            self._open_start_url(page, start_url)
 
-        self._open_start_url(page, start_url)
+        if not verify_steam_session:
+            return
 
         if context_has_steam_session(context):
             self.profile_store.mark_session_verified(account_name)
@@ -117,7 +133,9 @@ class BrowserLauncher:
 
         if not cookies:
             self.profile_store.clear_session_verification(account_name)
-            print("Steam session is not active and no cookies are available in storage.")
+            print(
+                "Steam session is not active and no cookies are available in storage."
+            )
             return
 
         logger.warning(
@@ -127,7 +145,8 @@ class BrowserLauncher:
         print("Session not active. Applying cookies from storage...")
 
         self._seed_cookies(context, cookies)
-        self._open_start_url(page, start_url)
+        if start_url:
+            self._open_start_url(page, start_url)
 
         if context_has_steam_session(context):
             self.profile_store.mark_session_verified(account_name)
