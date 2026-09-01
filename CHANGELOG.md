@@ -5,6 +5,40 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [4.0.0] 30-08-2026 - Browser Launcher: отдельный CLI для ручного входа в Steam
+
+### Added
+- 🌐 **Пакет `browser_launcher/`**: Отдельный модуль для запуска изолированного Chromium на аккаунт без интеграции в runtime `steam-bot`
+- 🚀 **CLI `steam-browser`**: Новая точка входа (`uv run steam-browser` или `uv run python cli_browser.py`)
+- 📋 **Интерактивное меню аккаунтов**: Список из `config.yaml`, выбор номером, возврат в меню после закрытия браузера
+- 🔒 **Session lock**: Маркер `[*]` для уже открытых аккаунтов, блокировка повторного запуска до закрытия окна (PID lock)
+- 🌍 **Отображение proxy IP**: В меню и при запуске показывается `host:port` без логина и пароля
+- 🍪 **Автозаливка cookies**: Чтение cookies из существующего storage (JSON/SQL) с конвертацией в формат Playwright
+- ✅ **Проверка Steam-сессии**: Контроль `steamLoginSecure`, повторная заливка cookies при «битом» профиле, маркер `.session_verified`
+- 📁 **Локальные профили браузера**: Каталог `./browser_profiles/` в корне проекта (добавлен в `.gitignore`)
+- 📦 **Опциональная зависимость `browser`**: Playwright в `[project.optional-dependencies]`, установка через `uv sync --extra browser`
+- 🧪 **Тесты browser launcher**:
+  - `tests/test_browser_launcher_cookie_converter.py`
+  - `tests/test_browser_launcher_profile_store.py`
+  - `tests/test_browser_launcher_proxy_utils.py`
+  - `tests/test_browser_launcher_session_check.py`
+  - `tests/test_browser_launcher_session_lock.py`
+- 📄 **Точка входа `cli_browser.py`**: Запуск browser launcher по аналогии с `cli.py`
+
+### Changed
+- 📦 **`pyproject.toml`**: Добавлен пакет `browser_launcher` в hatch build, entry point `steam-browser`, `pythonpath` для pytest
+- 🔧 **Таймаут Playwright**: 90 секунд на навигацию, ожидание закрытия браузера без обрыва сессии при долгой работе
+- 🧹 **Меню аккаунтов**: Proxy provider создаётся один раз на отрисовку меню (меньше шума в логах)
+
+### Security
+- 🔐 Профили браузера, lock-файлы и cookies не попадают в репозиторий
+- 🔐 Proxy credentials используются только внутри Playwright; в консоли отображается только endpoint
+- 🔐 Cookie storage используется в режиме read-only
+
+### Notes
+- ⚠️ `steam-browser` предназначен для машины с GUI (Windows/Linux desktop). На headless-сервере требуются системные зависимости Chromium (`playwright install-deps`) и X11 forwarding (например, через MobaXterm)
+- ⚠️ Рекомендуемый сценарий: бот на сервере, браузер для ручного входа — на локальном ПК
+
 ## [3.1.5] 05-03-2026 - Единая политика ошибок и traceback
 
 ### Added
