@@ -19,6 +19,7 @@ from .login import InvalidCredentials, LoginExecutor
 from .market import SteamMarket
 from .models import Asset, GameOptions, SteamUrl, TradeOfferState
 from .models import STEAM_URL, EResult
+from .session_check import check_session_static as is_market_session_alive
 from src.utils.delayed_http_adapter import DelayedHTTPAdapter
 
 
@@ -260,54 +261,8 @@ class SteamClient:
 
     @staticmethod
     def check_session_static(username, _session) -> bool:
-        main_page_response = _session.get(SteamUrl.COMMUNITY_URL)
-        return username.lower() in main_page_response.text.lower()
-    
-    @staticmethod
-    def check_session_via_trade_url(username, _session) -> bool:
-        """
-        Проверяет сессию через trade offer URL
-        
-        Args:
-            username: Имя пользователя для проверки
-            _session: HTTP сессия
-            
-        Returns:
-            bool: True если сессия активна, False если нет
-        """
-        try:
-            # Используем любой trade URL для проверки (этот партнер не важен)
-            trade_url = "https://steamcommunity.com/tradeoffer/new/?partner=1574630911&token=7x0AlLNq"
-            
-            response = _session.get(trade_url)
-            
-            # Логируем статус код и финальный URL
-            logger.info(f"🔍 Trade URL проверка: статус {response.status_code}")
-            logger.info(f"🔍 Trade URL проверка: финальный URL = {response.url}")
-            
-            # Проверяем финальный URL на наличие login
-            has_login_redirect = 'login' in response.url.lower()
-            if has_login_redirect:
-                logger.info(f"🔄 Trade URL проверка: редирект на login обнаружен - {response.url}")
-                return False
-
-            # Проверяем наличие username в содержимом страницы
-            username_lower = username.lower()
-            response_text = response.text.lower()
-            has_username = username_lower in response_text
-            
-            logger.info(f"🔍 Trade URL проверка: has_username = {has_username}")
-            
-            if has_username:
-                logger.info(f"✅ Trade URL проверка: сессия активна для {username}")
-                return True
-            else:
-                logger.info(f"❌ Trade URL проверка: сессия неактивна для {username} (username не найден)")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Ошибка проверки сессии через trade URL: {e}")
-            return False
+        """Return True when market/mylistings accepts the session cookies."""
+        return is_market_session_alive(username, _session)
 
     @login_required
     def save_session(self, path, username):

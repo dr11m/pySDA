@@ -5,6 +5,18 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [4.0.1] 01-09-2026 - Session check через market/mylistings
+
+### Changed
+- 🔍 **Проверка сессии**: `check_session_static()` больше не ищет username на главной Steam Community. Живость cookies определяется запросом `GET https://steamcommunity.com/market/mylistings?start=0&count=100` (HTTP 200 без редиректа на login).
+- 🧹 **Один зонд вместо двух**: при обновлении cookies убрана дополнительная проверка через trade offer URL. Если `mylistings` отвечает 400, сессия считается мёртвой и идёт refresh/login.
+
+### Fixed
+- 🐛 **Ложно живые cookies для маркета**: homepage и trade URL могли быть зелёными, пока потребители cookies получали `HTTP 400` на `market/mylistings`. Теперь тот же endpoint решает, отдавать ли cookies как valid.
+
+### Removed
+- 🗑️ **`check_session_via_trade_url()`**: больше не используется как критерий валидности сессии.
+
 ## [4.0.0] 30-08-2026 - Browser Launcher: отдельный CLI для ручного входа в Steam
 
 ### Added
