@@ -21,6 +21,19 @@ def test_check_session_static_treats_mylistings_http_400_as_dead() -> None:
     session.get.assert_called_once_with(MYLISTINGS_URL)
 
 
+def test_check_session_static_treats_mylistings_http_429_as_not_alive() -> None:
+    """Non-200 market/mylistings responses are not treated as a live session."""
+    session = Mock()
+    response = Mock()
+    response.status_code = 429
+    response.url = MYLISTINGS_URL
+    response.text = ""
+    session.get.return_value = response
+
+    assert check_session_static("anyuser", session) is False
+    session.get.assert_called_once_with(MYLISTINGS_URL)
+
+
 def test_check_session_static_treats_mylistings_http_200_as_alive() -> None:
     """HTTP 200 on market/mylistings must mark the session alive without scraping username HTML."""
     session = Mock()
