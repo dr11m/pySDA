@@ -30,7 +30,7 @@ accounts:
     password: ""
     mafile_path: "accounts_info/username.maFile"
     steam_id: ""
-    description: "описание аккаунта, нигде не используется, только для вашего удобства"
+    description: "описание аккаунта, показывается в списке аккаунтов CLI"
 
 
 #               Настройки Провайдеров Данных
