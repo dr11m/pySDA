@@ -3,7 +3,9 @@
 from typing import Any, Dict, List
 
 
-def session_dict_to_playwright_cookies(session_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def session_dict_to_playwright_cookies(
+    session_data: Dict[str, Any],
+) -> List[Dict[str, Any]]:
     """Convert session_to_dict payload into Playwright cookie dicts."""
     nested_cookies = session_data.get("cookies", session_data)
     if not isinstance(nested_cookies, dict):
