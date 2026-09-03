@@ -50,6 +50,7 @@ class BrowserConfigReader:
             username=username,
             cookie_storage_config=self._config_data.get("cookie_storage", {}),
             proxy_provider_config=self._config_data.get("proxy_provider", {}),
+            description=str(account_config.get("description") or ""),
         )
 
     def get_global(self, key: str, default: Any = None) -> Any:

@@ -20,6 +20,7 @@ class ProxySelection:
 
     proxy_mapping: Optional[Dict[str, str]]
     cancelled: bool = False
+    bypass_cs_deals: bool = False
 
 
 def select_proxy_mapping(settings: AccountSettings) -> ProxySelection:
@@ -34,9 +35,10 @@ def select_proxy_mapping(settings: AccountSettings) -> ProxySelection:
         print()
         print("Proxy selection")
         print(SEPARATOR)
-        print(f"  1. Account proxy ({account_proxy_label})")
-        print("  2. Direct (no proxy)")
-        print("  3. Custom proxy")
+        print(f"  1. Steam via account proxy, cs.deals direct ({account_proxy_label})")
+        print(f"  2. Account proxy ({account_proxy_label})")
+        print("  3. Direct (no proxy)")
+        print("  4. Custom proxy")
         print(SEPARATOR)
         print("  0. Back to account list")
         print(SEPARATOR)
@@ -51,18 +53,24 @@ def select_proxy_mapping(settings: AccountSettings) -> ProxySelection:
             return ProxySelection(proxy_mapping=None, cancelled=True)
 
         if raw_value == "1":
-            return ProxySelection(proxy_mapping=account_proxy_mapping)
+            return ProxySelection(
+                proxy_mapping=account_proxy_mapping,
+                bypass_cs_deals=True,
+            )
 
         if raw_value == "2":
-            return ProxySelection(proxy_mapping=None)
+            return ProxySelection(proxy_mapping=account_proxy_mapping)
 
         if raw_value == "3":
+            return ProxySelection(proxy_mapping=None)
+
+        if raw_value == "4":
             custom_selection = _read_custom_proxy()
             if custom_selection.cancelled:
                 continue
             return custom_selection
 
-        print("Invalid choice. Enter 1, 2, 3, or 0.")
+        print("Invalid choice. Enter 1, 2, 3, 4, or 0.")
 
 
 def _read_custom_proxy() -> ProxySelection:

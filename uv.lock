@@ -771,12 +771,13 @@ wheels = [
 
 [[package]]
 name = "pysda"
-version = "4.0.0"
+version = "4.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "aenum" },
     { name = "beautifulsoup4" },
     { name = "loguru" },
+    { name = "playwright" },
     { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -790,9 +791,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-browser = [
-    { name = "playwright" },
-]
 dev = [
     { name = "black" },
     { name = "flake8" },
@@ -816,7 +814,7 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "playwright", marker = "extra == 'browser'", specifier = ">=1.49.0" },
+    { name = "playwright", specifier = ">=1.62.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
@@ -829,7 +827,7 @@ requires-dist = [
     { name = "steampy", specifier = ">=1.2.0" },
     { name = "yarl", specifier = ">=1.9.0" },
 ]
-provides-extras = ["dev", "browser"]
+provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
