@@ -24,6 +24,7 @@ class AccountMenuItem:
     username: str
     proxy_label: str
     is_open: bool
+    description: str = ""
 
 
 def build_menu_items(
@@ -40,7 +41,9 @@ def build_menu_items(
             continue
 
         proxy_mapping = (
-            proxy_provider.get_proxy(account_name) if proxy_provider is not None else None
+            proxy_provider.get_proxy(account_name)
+            if proxy_provider is not None
+            else None
         )
         proxy_label = format_proxy_label(proxy_mapping)
 
@@ -54,6 +57,7 @@ def build_menu_items(
                 username=settings.username,
                 proxy_label=proxy_label,
                 is_open=is_open,
+                description=settings.description,
             )
         )
 
@@ -88,8 +92,11 @@ def render_menu(items: List[AccountMenuItem]) -> None:
 
     for item in items:
         marker = OPEN_MARKER if item.is_open else AVAILABLE_MARKER
+        display_name = item.account_name
+        if item.description:
+            display_name = f"{item.account_name} - {item.description}"
         print(
-            f" {item.index:>2}. {marker} {item.account_name}"
+            f" {item.index:>2}. {marker} {display_name}"
             f"  (user: {item.username}, proxy ip: {item.proxy_label})"
         )
 
@@ -115,7 +122,9 @@ def parse_selection(raw_value: str, items: List[AccountMenuItem]) -> int | None:
     return selected_index
 
 
-def find_item_by_index(items: List[AccountMenuItem], index: int) -> AccountMenuItem | None:
+def find_item_by_index(
+    items: List[AccountMenuItem], index: int
+) -> AccountMenuItem | None:
     """Return menu item for the selected index."""
     for item in items:
         if item.index == index:

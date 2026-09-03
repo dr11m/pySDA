@@ -1,6 +1,6 @@
 [project]
 name = "pySDA"
-version = "4.0.0"
+version = "4.0.1"
 description = "Автоматический торговый бот для Steam с поддержкой SDA"
 authors = [
     { name = "dr11m", email = "drr111m@gmail.com" }
@@ -23,6 +23,7 @@ dependencies = [
     "sqlalchemy>=2.0.41",
     "psycopg2-binary>=2.9.10",
     "ruamel-yaml>=0.18.14",
+    "playwright>=1.62.0",
 ]
 
 [project.optional-dependencies]
@@ -31,9 +32,6 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
-]
-browser = [
-    "playwright>=1.49.0",
 ]
 
 [build-system]
