@@ -43,7 +43,6 @@ from src.utils.compare_sessions import compare_sessions_and_log_diff
 from src.interfaces.storage_interface import CookieStorageInterface
 from src.utils.cookies_and_session import session_to_dict
 from src.utils.ip_utils import check_ip
-from src.cli.constants import Config
 
 
 class SteamClient:
@@ -97,6 +96,9 @@ class SteamClient:
     
     def _should_check_ip(self) -> bool:
         """Проверяет, нужно ли проверять IP перед запросами"""
+        # Local import to avoid circular dependency with src.cli package
+        from src.cli.constants import Config
+
         with open(Config.DEFAULT_CONFIG_PATH, 'r', encoding='utf-8') as f:
             config_data = yaml.safe_load(f)
             return config_data.get(Config.CHECK_IP_ON_EVERY_STEAM_REQUEST, False)
@@ -166,7 +168,7 @@ class SteamClient:
                                            self.steam_guard['shared_secret'],
                                            self._session)
             
-            cookies = login_executor.get_web_cookies(self.refresh_token, self.steam_id)
+            login_executor.get_web_cookies(self.refresh_token, self.steam_id)
 
             self._session = login_executor.session
 
@@ -320,15 +322,12 @@ class SteamClient:
             if self.is_invalid_api_key(response):
                 raise InvalidCredentials('Invalid API key')
         else:
-            # Для access_token проверяем другие типы ошибок
-            if response.status_code != 200:
-                try:
-                    error_data = response.json()
-                    if 'error' in error_data:
-                        raise InvalidCredentials(f"API Error: {error_data['error']}")
-                except:
-                    pass
+            # Для access_token: только статусы авторизации означают
+            # проблемы с credentials, остальные — обычные ошибки API
+            if response.status_code in (401, 403):
                 raise InvalidCredentials(f"HTTP {response.status_code}: {response.text}")
+            if response.status_code != 200:
+                raise ApiException(f"HTTP {response.status_code}: {response.text}")
 
         return response
 
