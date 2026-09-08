@@ -23,6 +23,12 @@ def load_debug_config() -> bool:
 debug_console_output = load_debug_config()
 os.makedirs("logs", exist_ok=True)
 
+# Windows consoles default to cp1251 which cannot encode emoji used in
+# messages; without this both print() and loguru console sinks crash
+# with UnicodeEncodeError.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 logger.remove()
 
 if debug_console_output:
