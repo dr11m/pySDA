@@ -6,6 +6,7 @@ import time
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
+import yaml
 from bs4 import BeautifulSoup
 
 from . import guard
@@ -38,6 +39,19 @@ class ConfirmationExecutor:
         self._my_steam_id = my_steam_id
         self._identity_secret = identity_secret
         self._session = session
+        self._retry_count, self._retry_delay = self._load_retry_config()
+
+    @staticmethod
+    def _load_retry_config() -> tuple[int, int]:
+        """Read confirmation retry settings from config.yaml."""
+        # Local import to avoid circular dependency with src.cli package
+        from src.cli.constants import Config
+
+        with open(Config.DEFAULT_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = yaml.safe_load(f) or {}
+        retry_count = int(config_data[Config.CONFIRMATION_RETRY_COUNT])
+        retry_delay = int(config_data[Config.CONFIRMATION_RETRY_DELAY])
+        return retry_count, retry_delay
 
     def send_trade_allow_request(self, trade_offer_id: str) -> dict:
         confirmations = self._get_confirmations()
@@ -63,17 +77,32 @@ class ConfirmationExecutor:
 
     def _get_confirmations(self) -> list[Confirmation]:
         confirmations = []
-        confirmations_page = self._fetch_confirmations_page()
-        if confirmations_page.status_code == HTTPStatus.OK:
-            confirmations_json = json.loads(confirmations_page.text)
-            for conf in confirmations_json['conf']:
-                data_confid = conf['id']
-                nonce = conf['nonce']
-                creator_id = int(conf["creator_id"])
-                confirmations.append(Confirmation(data_confid, nonce, creator_id))
-            return confirmations
-        else:
-            raise ConfirmationExpected
+        last_status = None
+        last_body = ''
+        for attempt in range(1, self._retry_count + 1):
+            confirmations_page = self._fetch_confirmations_page()
+            last_status = confirmations_page.status_code
+            last_body = confirmations_page.text
+            if last_status == HTTPStatus.OK:
+                confirmations_json = json.loads(last_body)
+                for conf in confirmations_json['conf']:
+                    data_confid = conf['id']
+                    nonce = conf['nonce']
+                    creator_id = int(conf["creator_id"])
+                    confirmations.append(Confirmation(data_confid, nonce, creator_id))
+                return confirmations
+            logger.warning(
+                f"⚠️ mobileconf/getlist вернул статус {last_status}: {last_body} "
+                f"(попытка {attempt}/{self._retry_count})"
+            )
+            if attempt < self._retry_count:
+                delay = self._retry_delay * attempt
+                logger.info(f"⏳ Повтор запроса подтверждений через {delay} сек")
+                time.sleep(delay)
+        raise ConfirmationExpected(
+            f"Confirmation list unavailable after {self._retry_count} attempts, "
+            f"last status {last_status}: {last_body}"
+        )
         
     def get_confirmation(self, key: str | int, *, update_listings=True) -> Confirmation:
         """
@@ -100,7 +129,7 @@ class ConfirmationExecutor:
         """Perform api key request confirmation."""
 
         conf = self.get_confirmation(request_id)
-        conf_response = self._send_confirmation(conf)
+        self._send_confirmation(conf)
 
         return conf
 
@@ -115,7 +144,7 @@ class ConfirmationExecutor:
         try:
             with open("debug_confirmations_page.txt", "w", encoding="utf-8") as f:
                 f.write(response.text)
-        except Exception as e:
+        except Exception:
             pass  # Не мешаем основной логике, если не удалось сохранить
         return response
 
