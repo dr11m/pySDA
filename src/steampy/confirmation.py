@@ -6,7 +6,6 @@ import time
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
-import yaml
 from bs4 import BeautifulSoup
 
 from . import guard
@@ -34,24 +33,13 @@ class Tag(enum.Enum):
 
 class ConfirmationExecutor:
     CONF_URL = 'https://steamcommunity.com/mobileconf'
+    CONFIRMATION_RETRY_COUNT = 3
+    CONFIRMATION_RETRY_DELAY = 15
 
     def __init__(self, identity_secret: str, my_steam_id: str, session: requests.Session) -> None:
         self._my_steam_id = my_steam_id
         self._identity_secret = identity_secret
         self._session = session
-        self._retry_count, self._retry_delay = self._load_retry_config()
-
-    @staticmethod
-    def _load_retry_config() -> tuple[int, int]:
-        """Read confirmation retry settings from config.yaml."""
-        # Local import to avoid circular dependency with src.cli package
-        from src.cli.constants import Config
-
-        with open(Config.DEFAULT_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            config_data = yaml.safe_load(f) or {}
-        retry_count = int(config_data[Config.CONFIRMATION_RETRY_COUNT])
-        retry_delay = int(config_data[Config.CONFIRMATION_RETRY_DELAY])
-        return retry_count, retry_delay
 
     def send_trade_allow_request(self, trade_offer_id: str) -> dict:
         confirmations = self._get_confirmations()
@@ -79,7 +67,9 @@ class ConfirmationExecutor:
         confirmations = []
         last_status = None
         last_body = ''
-        for attempt in range(1, self._retry_count + 1):
+        retry_count = self.CONFIRMATION_RETRY_COUNT
+        retry_delay = self.CONFIRMATION_RETRY_DELAY
+        for attempt in range(1, retry_count + 1):
             confirmations_page = self._fetch_confirmations_page()
             last_status = confirmations_page.status_code
             last_body = confirmations_page.text
@@ -93,14 +83,14 @@ class ConfirmationExecutor:
                 return confirmations
             logger.warning(
                 f"⚠️ mobileconf/getlist вернул статус {last_status}: {last_body} "
-                f"(попытка {attempt}/{self._retry_count})"
+                f"(попытка {attempt}/{retry_count})"
             )
-            if attempt < self._retry_count:
-                delay = self._retry_delay * attempt
+            if attempt < retry_count:
+                delay = retry_delay * attempt
                 logger.info(f"⏳ Повтор запроса подтверждений через {delay} сек")
                 time.sleep(delay)
         raise ConfirmationExpected(
-            f"Confirmation list unavailable after {self._retry_count} attempts, "
+            f"Confirmation list unavailable after {retry_count} attempts, "
             f"last status {last_status}: {last_body}"
         )
         
@@ -196,4 +186,3 @@ class ConfirmationExecutor:
         soup = BeautifulSoup(confirmation_details_page, 'html.parser')
         full_offer_id = soup.select('.tradeoffer')[0]['id']
         return full_offer_id.split('_')[1]
-
