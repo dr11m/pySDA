@@ -33,6 +33,8 @@ class Tag(enum.Enum):
 
 class ConfirmationExecutor:
     CONF_URL = 'https://steamcommunity.com/mobileconf'
+    CONFIRMATION_RETRY_COUNT = 3
+    CONFIRMATION_RETRY_DELAY = 15
 
     def __init__(self, identity_secret: str, my_steam_id: str, session: requests.Session) -> None:
         self._my_steam_id = my_steam_id
@@ -63,17 +65,34 @@ class ConfirmationExecutor:
 
     def _get_confirmations(self) -> list[Confirmation]:
         confirmations = []
-        confirmations_page = self._fetch_confirmations_page()
-        if confirmations_page.status_code == HTTPStatus.OK:
-            confirmations_json = json.loads(confirmations_page.text)
-            for conf in confirmations_json['conf']:
-                data_confid = conf['id']
-                nonce = conf['nonce']
-                creator_id = int(conf["creator_id"])
-                confirmations.append(Confirmation(data_confid, nonce, creator_id))
-            return confirmations
-        else:
-            raise ConfirmationExpected
+        last_status = None
+        last_body = ''
+        retry_count = self.CONFIRMATION_RETRY_COUNT
+        retry_delay = self.CONFIRMATION_RETRY_DELAY
+        for attempt in range(1, retry_count + 1):
+            confirmations_page = self._fetch_confirmations_page()
+            last_status = confirmations_page.status_code
+            last_body = confirmations_page.text
+            if last_status == HTTPStatus.OK:
+                confirmations_json = json.loads(last_body)
+                for conf in confirmations_json['conf']:
+                    data_confid = conf['id']
+                    nonce = conf['nonce']
+                    creator_id = int(conf["creator_id"])
+                    confirmations.append(Confirmation(data_confid, nonce, creator_id))
+                return confirmations
+            logger.warning(
+                f"⚠️ mobileconf/getlist вернул статус {last_status}: {last_body} "
+                f"(попытка {attempt}/{retry_count})"
+            )
+            if attempt < retry_count:
+                delay = retry_delay * attempt
+                logger.info(f"⏳ Повтор запроса подтверждений через {delay} сек")
+                time.sleep(delay)
+        raise ConfirmationExpected(
+            f"Confirmation list unavailable after {retry_count} attempts, "
+            f"last status {last_status}: {last_body}"
+        )
         
     def get_confirmation(self, key: str | int, *, update_listings=True) -> Confirmation:
         """
@@ -100,7 +119,7 @@ class ConfirmationExecutor:
         """Perform api key request confirmation."""
 
         conf = self.get_confirmation(request_id)
-        conf_response = self._send_confirmation(conf)
+        self._send_confirmation(conf)
 
         return conf
 
@@ -115,7 +134,7 @@ class ConfirmationExecutor:
         try:
             with open("debug_confirmations_page.txt", "w", encoding="utf-8") as f:
                 f.write(response.text)
-        except Exception as e:
+        except Exception:
             pass  # Не мешаем основной логике, если не удалось сохранить
         return response
 
@@ -167,4 +186,3 @@ class ConfirmationExecutor:
         soup = BeautifulSoup(confirmation_details_page, 'html.parser')
         full_offer_id = soup.select('.tradeoffer')[0]['id']
         return full_offer_id.split('_')[1]
-

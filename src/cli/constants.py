@@ -189,4 +189,4 @@ class Config:
     IMPORTANT_COOKIES = ['sessionid', 'steamLoginSecure']
     
     # Ключи глобальных настроек
-    CHECK_IP_ON_EVERY_STEAM_REQUEST = 'check_ip_on_every_steam_request' 
+    CHECK_IP_ON_EVERY_STEAM_REQUEST = 'check_ip_on_every_steam_request'
