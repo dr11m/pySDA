@@ -190,5 +190,3 @@ class Config:
     
     # Ключи глобальных настроек
     CHECK_IP_ON_EVERY_STEAM_REQUEST = 'check_ip_on_every_steam_request'
-    CONFIRMATION_RETRY_COUNT = 'confirmation_retry_count'
-    CONFIRMATION_RETRY_DELAY = 'confirmation_retry_delay'
