@@ -193,6 +193,7 @@ debug_confirmations_page.txt
 # Debug files
 debug_*.json
 debug_*.txt
+response_text.txt
 debug_info/*
 CLAUDE.md
 .agents/

@@ -78,7 +78,7 @@ def format_cookies_for_domain(cookies_dict: dict, domain: str) -> list[str]:
 
 # Пример использования
 if __name__ == '__main__':
-    refresh_token = "***REMOVED***"
+    refresh_token = "REFRESH_TOKEN_HERE"
 
     
     try:

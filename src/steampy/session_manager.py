@@ -204,7 +204,7 @@ class SecureSessionManager:
             session_data = None if force_refresh else self._load_session_secure()
             
             self.client = SteamClient(
-                api_key="***REMOVED***",
+                api_key=api_key,
                 username=self.username,
                 password=password,
                 steam_guard=guard_path
