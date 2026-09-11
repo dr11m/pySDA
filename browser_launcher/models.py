@@ -1,8 +1,8 @@
 """Data models for the browser launcher."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -29,3 +29,4 @@ class LaunchOptions:
     verify_steam_session: bool = False
     seed_cookies: bool = False
     bypass_cs_deals: bool = False
+    extension_paths: List[str] = field(default_factory=list)

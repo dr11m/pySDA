@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from loguru import logger
 
 from browser_launcher.cookie_reader import load_playwright_cookies
+from browser_launcher.extensions import build_extension_args
 from browser_launcher.models import AccountSettings, LaunchOptions
 from browser_launcher.profile_store import ProfileStore
 from browser_launcher.proxy_format import format_proxy_label
@@ -53,6 +54,8 @@ class BrowserLauncher:
         logger.info("Opening browser for account '{}'", account.account_name)
         logger.info("Profile directory: {}", profile_dir)
         print(f"Proxy IP: {proxy_label}")
+        if options.extension_paths:
+            logger.info("Extensions: {}", ", ".join(options.extension_paths))
         if playwright_proxy:
             logger.info("Proxy endpoint: {}", proxy_label)
             if options.bypass_cs_deals:
@@ -68,7 +71,10 @@ class BrowserLauncher:
                     headless=False,
                     proxy=playwright_proxy,
                     no_viewport=True,
-                    args=["--disable-blink-features=AutomationControlled"],
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        *build_extension_args(options.extension_paths),
+                    ],
                 )
                 context.set_default_timeout(BROWSER_TIMEOUT_MS)
                 context.set_default_navigation_timeout(BROWSER_TIMEOUT_MS)

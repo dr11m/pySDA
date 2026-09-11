@@ -7,6 +7,8 @@ from pathlib import Path
 from loguru import logger
 
 from browser_launcher.config_reader import BrowserConfigReader
+from browser_launcher.extension_menu import select_extensions
+from browser_launcher.extensions import discover_extensions
 from browser_launcher.launcher import BrowserLauncher
 from browser_launcher.menu import (
     build_menu_items,
@@ -118,6 +120,14 @@ def _run_interactive_menu(args: argparse.Namespace) -> None:
             start_url = DEFAULT_START_URL
             verify_steam_session = True
 
+        available_extensions = discover_extensions()
+        extension_paths: list[str] = []
+        if available_extensions:
+            extension_selection = select_extensions(available_extensions)
+            if extension_selection.cancelled:
+                continue
+            extension_paths = extension_selection.extension_paths
+
         options = LaunchOptions(
             account_name=selected_item.account_name,
             start_url=start_url,
@@ -128,6 +138,7 @@ def _run_interactive_menu(args: argparse.Namespace) -> None:
             verify_steam_session=verify_steam_session,
             seed_cookies=True,
             bypass_cs_deals=proxy_selection.bypass_cs_deals,
+            extension_paths=extension_paths,
         )
         launcher.open_account(settings, options)
         print(f"Browser for '{selected_item.account_name}' was closed.")
