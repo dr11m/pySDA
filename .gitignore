@@ -202,3 +202,5 @@ skills-lock.json
 
 # Local editor settings
 .vscode/settings.json
+browser_extensions/*
+!browser_extensions/.gitkeep
