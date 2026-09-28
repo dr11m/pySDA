@@ -13,11 +13,6 @@ from src.implementations.notifications.logger_notification import LoggerNotifica
 from src.implementations.notifications.telegram_notification import TelegramNotification
 from src.cli.config_manager import ConfigManager
 
-import os
-print("Текущий рабочий каталог:", os.getcwd())
-print("Содержимое config.yaml:")
-with open("config.yaml", "r", encoding="utf-8") as f:
-    print(f.read())
 
 
 class MockNotificationProvider(NotificationInterface):

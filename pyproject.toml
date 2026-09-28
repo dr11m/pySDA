@@ -50,7 +50,7 @@ dev-dependencies = [
 ]
 
 [project.scripts]
-steam-bot = "main:main"
+steam-bot = "src.cli_interface:run_cli"
 steam-browser = "browser_launcher.cli:main"
 
 [tool.pytest.ini_options]
