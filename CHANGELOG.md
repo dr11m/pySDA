@@ -5,6 +5,44 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [5.0.0] 28-09-2026 - Явная маршрутизация аккаунтов и таймауты Steam HTTP
+
+### Fixed
+
+- **Зависание при создании клиента**: удалён автоматический `ping_proxy()` на `steamcommunity.com`, который выполнялся до установки HTTP-адаптера без таймаута.
+- **Таймауты при любой задержке**: HTTP-адаптер устанавливается при `min_request_delay_ms = 0` и сохраняет таймауты при временном изменении задержки.
+- **Восстановление pickle-сессий**: текущий маршрут заменяет сохранённые прокси; старые адаптеры, включая адаптеры для конкретных хостов, заменяются текущими настройками.
+- **Ошибки прокси**: отсутствующая/пустая запись и ошибка БД больше не превращаются в прямое подключение.
+- **Импорт библиотеки**: убраны циклы, возникавшие из-за загрузки runtime-меню и обработчиков из `src.cli.__init__`.
+- **Установленный CLI**: `steam-bot` вызывает существующую функцию `src.cli_interface:run_cli` вместо отсутствующего `main:main`.
+- **Логирование**: удалён вывод proxy credentials, содержимого auth-ответов, cookie values и префиксов refresh/access tokens из затронутого runtime-пути; тест ошибок больше не печатает `config.yaml`.
+
+### Added
+
+- **Обязательные настройки HTTP**: `request_connect_timeout_seconds` и `request_read_timeout_seconds` в `config.yaml`, с валидацией положительных конечных значений.
+- **Диагностика запросов**: debug-события начала и завершения запроса, статус и длительность; warning при сетевой ошибке без query parameters и payload.
+- **Офлайн-проверки**: маршрутизация login/refresh/API/session-check/confirmations, изоляция аккаунтов, старые сессии, ошибки провайдеров, безопасные логи, точки входа и импорт в отдельном процессе.
+
+### Changed
+
+- **Маршрут аккаунта**: `http` и `https` обязательны в переданной proxy mapping; переменные окружения Requests не переопределяют маршрут (`trust_env = False`). Провайдеры разрешают direct только через явное `no_proxy`.
+- **Ручные live-сценарии**: `test_cookies_debug.py`, `test_refresh_token_force.py` и `test_real_refresh_token_login.py` перенесены из `tests/` в `scripts/`, чтобы общий pytest не обновлял реальные сессии и БД.
+- **Тесты vendored Steam-кода**: `tests_steampy/` импортирует `src.steampy`, а не сторонний установленный пакет `steampy`.
+
+### Removed
+
+- `src.steampy.utils.ping_proxy()` и константа `Config.CHECK_IP_ON_EVERY_STEAM_REQUEST`.
+- Аргумент `request_delay_sec` у `CookieManager` и `initialize_cookie_manager()`; задержка читается из `min_request_delay_ms`.
+- Реэкспорты runtime-меню, обработчиков и `AutoManager` из `src.cli`; используйте их собственные модули.
+
+### Migration
+
+- Добавьте в существующий `config.yaml` `request_connect_timeout_seconds: 10` и `request_read_timeout_seconds: 30`. Поля `min_request_delay_ms` и `check_ip_on_every_steam_request` также обязательны; образец — `config.example.yaml`.
+- Проверьте запись каждого аккаунта в JSON/SQL-провайдере: URL прокси или явное `no_proxy`. Исправьте отсутствующие записи до перезапуска.
+- Уберите `request_delay_sec` из вызовов cookie manager. Для прямого использования `DelayedHTTPAdapter` теперь явно передавайте `delay` и `timeout=(connect, read)`.
+- Таймаут чтения ограничивает ожидание данных сокета, а не общую длительность операции. Несколько HTTP-запросов, редиректы, задержки и повторные попытки суммируются.
+- Версия повышена до 5.0.0 из-за обязательной миграции конфигурации и изменений публичного API. Старые pickle-сессии поддерживаются с заменой маршрута и адаптеров при загрузке клиентом.
+
 ## [4.1.0] 11-09-2026 - Расширения браузера: выбор расширения при запуске
 
 ### Added
