@@ -35,7 +35,7 @@ def test_real_refresh_token_login():
         
         if isinstance(session_data, tuple):
             session, refresh_token = session_data
-            print(f"✅ Найден refresh token: {refresh_token[:20]}...")
+            print("Refresh token found")
         else:
             print("❌ Старый формат pkl файла без refresh token")
             return False
@@ -53,7 +53,7 @@ def test_real_refresh_token_login():
         )
         
         # Добавляем адаптер с задержкой 0 для теста
-        adapter = DelayedHTTPAdapter(delay=0)
+        adapter = DelayedHTTPAdapter(delay=0, timeout=steam_client.request_timeout, username=steam_client.username)
         steam_client._session.mount('http://', adapter)
         steam_client._session.mount('https://', adapter)
         
@@ -234,4 +234,4 @@ if __name__ == "__main__":
     else:
         print("\n❌ Основной тест не прошел")
     
-    print("\n�� Тест завершен!") 
+    print("\n�� Тест завершен!")

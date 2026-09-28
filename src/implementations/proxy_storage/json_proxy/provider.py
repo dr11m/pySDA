@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from src.interfaces.proxy_provider import ProxyProviderInterface
 
@@ -18,19 +18,29 @@ class JsonProxyProvider(ProxyProviderInterface):
 
     def _load_proxies(self) -> Dict[str, str]:
         """Load proxy mappings from the configured JSON file."""
-        if not self.json_path.exists():
-            return {}
         with open(self.json_path, "r", encoding="utf-8") as file:
             return json.load(file)
 
-    def get_proxy(self, account_name: str) -> Optional[Dict[str, str]]:
-        """Return requests-compatible proxy settings for an account."""
-        proxy_url = self._proxies.get(account_name)
+    def get_proxy(self, account_name: str) -> dict[str, str] | None:
+        """Resolve an explicitly configured account route.
 
-        if not proxy_url or str(proxy_url).lower() == "no_proxy":
+        Args:
+            account_name: Account whose proxy setting is required.
+
+        Returns:
+            HTTP and HTTPS proxies, or None for explicit no_proxy.
+
+        Raises:
+            ValueError: The account setting is missing or empty.
+        """
+        proxy_url: str | None = self._proxies.get(account_name)
+
+        if proxy_url is None or not proxy_url.strip():
+            raise ValueError(f"Proxy is not configured for account '{account_name}'; use 'no_proxy' for direct access")
+
+        proxy_url = proxy_url.strip()
+        if proxy_url.lower() == "no_proxy":
             return None
-
-        proxy_url = str(proxy_url)
 
         if "@" not in proxy_url and ":" in proxy_url and proxy_url.count(":") >= 3:
             stripped = proxy_url

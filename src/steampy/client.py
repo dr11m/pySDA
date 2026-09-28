@@ -20,7 +20,7 @@ from .market import SteamMarket
 from .models import Asset, GameOptions, SteamUrl, TradeOfferState
 from .models import STEAM_URL, EResult
 from .session_check import check_session_static as is_market_session_alive
-from src.utils.delayed_http_adapter import DelayedHTTPAdapter
+from src.utils.delayed_http_adapter import DelayedHTTPAdapter, SteamHttpSettings
 
 
 from .utils import (
@@ -31,7 +31,6 @@ from .utils import (
     merge_items_with_descriptions_from_inventory,
     merge_items_with_descriptions_from_offer,
     merge_items_with_descriptions_from_offers,
-    ping_proxy,
     steam_id_to_account_id,
     text_between,
     texts_between,
@@ -39,10 +38,10 @@ from .utils import (
 )
 
 from src.utils.logger_setup import logger
-from src.utils.compare_sessions import compare_sessions_and_log_diff
 from src.interfaces.storage_interface import CookieStorageInterface
 from src.utils.cookies_and_session import session_to_dict
 from src.utils.ip_utils import check_ip
+from src.cli.constants import Config
 
 
 class SteamClient:
@@ -56,16 +55,17 @@ class SteamClient:
         username: str | None = None,
         password: str | None = None,
         steam_guard: str | None = None,
-        proxies: dict | None = None,
+        proxies: dict[str, str] | None = None,
         steam_id: str | None = None,
         session_path: str | None = None,
-        storage: 'CookieStorageInterface' = None,
+        storage: "CookieStorageInterface" = None,
     ) -> None:
         self._api_key = api_key
         self.steam_id = steam_id
         self.session_path = session_path 
         self.refresh_token = None
         self.storage = storage
+        self.username: str | None = username
 
         # Инициализируем сессию сначала
         if session_path and os.path.exists(session_path):
@@ -74,9 +74,19 @@ class SteamClient:
         else:
             self._session = requests.Session()
 
-        # Теперь можем устанавливать прокси
-        if proxies:
-            self.set_proxies(proxies)
+        self._http_settings: SteamHttpSettings = self._load_http_settings()
+        self.request_timeout: tuple[float, float] = self._http_settings.timeout
+        self.set_proxies(proxies)
+        adapter: DelayedHTTPAdapter = DelayedHTTPAdapter(
+            delay=self._http_settings.min_request_delay_ms / 1000.0,
+            timeout=self.request_timeout,
+            username=username,
+        )
+        # Remove saved host-specific adapters that can override scheme timeouts.
+        self._session.close()
+        self._session.adapters.clear()
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
 
         self.steam_guard_string = steam_guard
         if self.steam_guard_string is not None:
@@ -85,24 +95,19 @@ class SteamClient:
             self.steam_guard = None
 
         self.was_login_executed = False
-        self.username = username
         self._password = password
 
         self.market = SteamMarket(self._session, self.steam_id)
         
         # Переопределяем методы сессии для проверки IP если настройка включена
-        if self._should_check_ip():
+        if self._http_settings.check_ip_on_every_steam_request:
             self._wrap_session_methods()
-    
-    def _should_check_ip(self) -> bool:
-        """Проверяет, нужно ли проверять IP перед запросами"""
-        # Local import to avoid circular dependency with src.cli package
-        from src.cli.constants import Config
 
+    def _load_http_settings(self) -> SteamHttpSettings:
+        """Validate required request settings from the runtime config."""
         with open(Config.DEFAULT_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            config_data = yaml.safe_load(f)
-            return config_data.get(Config.CHECK_IP_ON_EVERY_STEAM_REQUEST, False)
-    
+            return SteamHttpSettings.model_validate(yaml.safe_load(f))
+
     def _wrap_session_methods(self):
         """Оборачиваем методы сессии для проверки IP перед каждым запросом"""
         original_get = self._session.get
@@ -134,7 +139,7 @@ class SteamClient:
             original_adapters[prefix] = original_adapter
             
             # Создаем НОВЫЙ адаптер с нужной задержкой
-            new_adapter = DelayedHTTPAdapter(delay=new_delay)
+            new_adapter: DelayedHTTPAdapter = DelayedHTTPAdapter(delay=new_delay, timeout=self.request_timeout, username=self.username)
             self._session.mount(prefix, new_adapter)
             
             logger.debug(f"Установлен временный адаптер для {prefix} с задержкой {new_delay}")
@@ -155,13 +160,9 @@ class SteamClient:
             return False
             
         try:
-            logger.info(f"🔄 Пробуем обновить сессию через refresh токен ({self.refresh_token[:10]}...) для {self.username} [{self.steam_id}]")
-            
-            # Логируем старые cookies
-            old_session = self._session
-            logger.info(f"📋 Старые cookies: {self._session.__dict__}")
-            
-            
+            logger.info(f"Refreshing Steam session for {self.username} [{self.steam_id}]")
+            logger.debug(f"Session before refresh: account={self.username} cookies={len(self._session.cookies)}")
+
             login_executor = LoginExecutor(self.steam_id,
                                            self.username,
                                            self._password,
@@ -174,16 +175,13 @@ class SteamClient:
 
             self.was_login_executed = True
 
-            new_session = self._session
-            compare_sessions_and_log_diff(old_session, new_session)
 
             # Сохраняем сессию
             self.save_session(os.path.dirname(self.session_path), self.username)
             logger.info(f"💾 Сессия сохранена в pkl и в хранилище для {self.username}")
-            
-            # Логируем новые cookies
-            logger.info(f"📋 Новые cookies: {self._session.__dict__}")
-            
+
+            logger.debug(f"Session after refresh: account={self.username} cookies={len(self._session.cookies)}")
+
             logger.info(f"✅ Сессия обновлена через refresh токен для {self.username}")
             
             # Проверяем сессию
@@ -197,15 +195,30 @@ class SteamClient:
             logger.error(f"❌ Ошибка обновления сессии для {self.username}: {e}")
             return False
 
-    def set_proxies(self, proxies: dict) -> dict:
-        if not isinstance(proxies, dict):
+    def set_proxies(self, proxies: dict[str, str] | None) -> dict[str, str] | None:
+        """Replace saved routing with the account route without a network probe.
+
+        Args:
+            proxies: Both HTTP and HTTPS routes, or None for explicit direct access.
+
+        Returns:
+            The configured route supplied by the caller.
+
+        Raises:
+            TypeError: The proxy mapping has an invalid type.
+            ValueError: Either required proxy route is missing.
+        """
+        if proxies is not None and not isinstance(proxies, dict):
             raise TypeError(
                 'Proxy must be a dict. Example: '
                 r'\{"http": "http://login:password@host:port"\, "https": "http://login:password@host:port"\}',
             )
 
-        if ping_proxy(proxies):
-            self._session.proxies.update(proxies)
+        if proxies is not None and (not proxies.get("http") or not proxies.get("https")):
+            raise ValueError("Account proxy must specify both http and https routes")
+        self._session.trust_env = False
+        self._session.proxies = dict(proxies) if proxies is not None else {}
+        logger.debug(f"Steam routing configured: account={self.username} mode={'proxy' if proxies is not None else 'direct'}")
 
         return proxies
 

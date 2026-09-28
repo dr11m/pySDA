@@ -257,10 +257,10 @@ class TradeConfirmationManager:
             logger.info(f"📋 Все доступные cookies в trade_confirmation_manager: {available_cookies}")
             
             # Показываем детальную информацию о каждом cookie
-            logger.info("🔍 Детальная информация о cookies:")
+            logger.debug("Session cookie metadata:")
             for cookie in jar:
-                logger.info(f"  {cookie.name}@{cookie.domain} = {cookie.value[:50]}... (secure: {cookie.secure}, expires: {cookie.expires})")
-            
+                logger.debug(f"Cookie name={cookie.name} domain={cookie.domain} secure={cookie.secure} expires={cookie.expires}")
+
             # Ищем steamLoginSecure в любом домене для отладки
             steam_login_secure_found = False
             for cookie in jar:
@@ -289,7 +289,7 @@ class TradeConfirmationManager:
                 return None
             
             access_token = access_token_parts[1]
-            logger.info(f"✅ Access token извлечен: {access_token[:15]}...")
+            logger.debug(f"Steam access token extracted for account={self.username}")
             return access_token
             
         except Exception:

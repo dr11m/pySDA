@@ -28,7 +28,7 @@ def test_refresh_token_force():
     
     if isinstance(session_data, tuple):
         session, refresh_token = session_data
-        print(f"✅ Найден refresh token: {refresh_token[:20]}...")
+        print("Refresh token found")
     else:
         print("❌ Старый формат pkl файла без refresh token")
         return
@@ -42,7 +42,7 @@ def test_refresh_token_force():
     )
     
     # Добавляем адаптер без задержки для теста
-    adapter = DelayedHTTPAdapter(delay=0)
+    adapter = DelayedHTTPAdapter(delay=0, timeout=steam_client.request_timeout, username=steam_client.username)
     steam_client._session.mount('http://', adapter)
     steam_client._session.mount('https://', adapter)
     
@@ -60,4 +60,4 @@ def test_refresh_token_force():
 
 if __name__ == "__main__":
     test_refresh_token_force()
-    print("\n�� Тест завершен!") 
+    print("\n�� Тест завершен!")

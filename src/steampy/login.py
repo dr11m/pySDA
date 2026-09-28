@@ -44,7 +44,7 @@ class LoginExecutor:
     def login(self) -> tuple[Session, str]:
         try:
             login_response = self._send_login_request()
-            logger.debug(f"BeginAuthSessionViaCredentials response for {self.username}: {login_response.json()}")
+            logger.debug(f"BeginAuthSessionViaCredentials response for {self.username}: status={login_response.status_code}")
             if not login_response.json()['response']:
                 raise ApiException('No response received from Steam API. Please try again later.')
 
@@ -430,7 +430,7 @@ class LoginExecutor:
                     raise Exception(f'HTTP error {result.status_code}')
 
                 json_result = result.json()
-                logger.info(f"🔍 JSON result: {json_result}")
+                logger.info(f"Steam cookie transfer response: account={self.username} status={json_result.get('result')}")
                 if json_result.get('result') and json_result['result'] != TransferResult.OK:
                     raise Exception(f'Steam error result: {json_result["result"]}')
                     # Проверяем срок действия refresh токена

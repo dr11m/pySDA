@@ -10,11 +10,10 @@ from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 import decimal
 
-import requests
 from bs4 import BeautifulSoup, Tag
 from requests.structures import CaseInsensitiveDict
 
-from .exceptions import LoginRequired, ProxyConnectionError
+from .exceptions import LoginRequired
 
 if TYPE_CHECKING:
     from .models import GameOptions
@@ -261,14 +260,5 @@ class Credentials:
         self.api_key = api_key
 
 
-def ping_proxy(proxies: dict) -> bool:
-    try:
-        requests.get('https://steamcommunity.com/', proxies=proxies)
-        return True
-    except Exception:
-        raise ProxyConnectionError('Proxy not working for steamcommunity.com')
-
-
 def create_cookie(name: str, cookie: str, domain: str) -> dict:
     return {'name': name, 'value': cookie, 'domain': domain}
-

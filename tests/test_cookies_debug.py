@@ -28,7 +28,7 @@ def test_cookies_after_refresh():
     with open(pkl_path, 'rb') as f:
         session, refresh_token = pickle.load(f)
     
-    print(f"✅ Найден refresh token: {refresh_token[:20]}...")
+    print("Refresh token found")
     
     # Создаем SteamClient
     steam_client = SteamClient(
@@ -38,17 +38,6 @@ def test_cookies_after_refresh():
     
     print("✅ SteamClient создан")
     
-    # Убираем адаптеры если они есть
-    steam_client._session.adapters.clear()
-    print("✅ Адаптеры очищены")
-    
-    # Добавляем стандартный адаптер
-    from requests.adapters import HTTPAdapter
-    adapter = HTTPAdapter()
-    steam_client._session.mount('http://', adapter)
-    steam_client._session.mount('https://', adapter)
-    print("✅ Стандартный адаптер добавлен")
-    
     # Пробуем refresh
     if steam_client._try_refresh_session():
         print("✅ Refresh успешен")
@@ -56,7 +45,7 @@ def test_cookies_after_refresh():
         # Показываем все cookies
         print("\n📋 Все cookies после refresh:")
         for cookie in steam_client._session.cookies:
-            print(f"  {cookie.name}@{cookie.domain} = {cookie.value[:50]}...")
+            print(f"Cookie name={cookie.name} domain={cookie.domain} secure={cookie.secure} expires={cookie.expires}")
         
         # Ищем steamLoginSecure
         steam_login_secure = None
@@ -88,4 +77,4 @@ def test_cookies_after_refresh():
         print("❌ Refresh не удался")
 
 if __name__ == "__main__":
-    test_cookies_after_refresh() 
+    test_cookies_after_refresh()
