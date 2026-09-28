@@ -6,7 +6,6 @@
 import os
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, Optional
 
 from dotenv import load_dotenv
 
@@ -44,9 +43,8 @@ class AccountProxy(Base):
     update_time = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    def __repr__(self):
-        return f"<AccountProxy(username='{self.username}', proxy='{self.proxy}')>"
-
+    def __repr__(self) -> str:
+        return f"<AccountProxy(username='{self.username}')>"
 
 
 class SqlAlchemyProxyProvider(ProxyProviderInterface):
@@ -105,62 +103,55 @@ class SqlAlchemyProxyProvider(ProxyProviderInterface):
             echo=False,
         )
 
-    def get_proxy(self, account_name: str) -> Optional[Dict[str, str]]:
-        """
-        Возвращает прокси для указанного аккаунта из базы данных.
-        Обрабатывает специальное значение 'no_proxy'.
-        """
-        session = self.Session()
-        try:
-            record = session.query(AccountProxy).filter_by(username=account_name).first()
-            
-            # Если записи или прокси нет, возвращаем None
-            if not record or not record.proxy:
-                logger.debug(f"Прокси для '{account_name}' не найден в БД.")
-                return None
+    def get_proxy(self, account_name: str) -> dict[str, str] | None:
+        """Load the account route; propagate missing settings and DB errors.
 
-            proxy_data = record.proxy.strip()
+        Args:
+            account_name: Account whose route is required.
 
-            # Проверяем на специальное значение "no_proxy"
+        Returns:
+            HTTP and HTTPS proxies, or None for the explicit no_proxy marker.
+
+        Raises:
+            ValueError: The account proxy is missing or empty.
+        """
+        with self.Session() as session:
+            record: AccountProxy | None = session.query(AccountProxy).filter_by(username=account_name).first()
+            if record is None or not record.proxy or not record.proxy.strip():
+                raise ValueError(f"Proxy is not configured for account '{account_name}'; use 'no_proxy' for direct access")
+
+            proxy_data: str = record.proxy.strip()
             if proxy_data.lower() == 'no_proxy':
-                logger.info(f"Для аккаунта '{account_name}' явно указано 'no_proxy'. Соединение будет прямым.")
+                logger.info(f"Account '{account_name}' explicitly uses no_proxy")
                 return None
 
-            # --- Авто-конвертация формата host:port:username:password в username:password@host:port ---
-            if ':' in proxy_data and proxy_data.count(':') >= 3:
-                # Парсим формат "http://host:port:username:password"
+            if "@" not in proxy_data and proxy_data.count(":") >= 3:
                 if proxy_data.startswith('http://'):
-                    proxy_data_ = proxy_data[7:]
-                    prefix = 'http://'
+                    proxy_data_: str = proxy_data[7:]
+                    prefix: str = "http://"
                 elif proxy_data.startswith('https://'):
                     proxy_data_ = proxy_data[8:]
                     prefix = 'https://'
                 else:
                     proxy_data_ = proxy_data
                     prefix = 'http://'
-                parts = proxy_data_.split(':')
+                parts: list[str] = proxy_data_.split(":")
                 if len(parts) >= 4:
-                    host = parts[0]
-                    port = parts[1]
-                    username = parts[2]
-                    password = parts[3]
-                    formatted_proxy = f"{prefix}{username}:{password}@{host}:{port}"
+                    host: str = parts[0]
+                    port: str = parts[1]
+                    username: str = parts[2]
+                    password: str = parts[3]
+                    formatted_proxy: str = f"{prefix}{username}:{password}@{host}:{port}"
                     return {
                         'http': formatted_proxy,
                         'https': formatted_proxy
                     }
 
-            # Если уже в правильном формате, используем как есть
             return {
                 'http': proxy_data,
                 'https': proxy_data 
             }
             
-        except Exception as e:
-            logger.error(f"Ошибка загрузки прокси из БД для {account_name}: {e}")
-            return None
-        finally:
-            session.close() 
 
 
 if __name__ == '__main__':

@@ -11,30 +11,29 @@ from typing import Dict, Optional, Any
 from src.utils.logger_setup import logger, print_and_log, log_exception
 from src.steampy.client import SteamClient
 from src.interfaces.storage_interface import CookieStorageInterface as StorageInterface
-from src.utils.delayed_http_adapter import DelayedHTTPAdapter
 from src.utils.cookies_and_session import session_to_dict
 from src.cli.config_manager import global_config
 
 
 class CookieManager:
     """Менеджер для управления Steam cookies для конкретного аккаунта"""
-    
-    def __init__(self, 
-                 username: str = None,
-                 password: str = None,
-                 mafile_path: str = None,
-                 steam_id: str = None,
-                 storage: StorageInterface = None,
-                 accounts_dir: str = "accounts_info",
-                 proxy: Optional[Dict[str, str]] = None,
-                 request_delay_sec: float = 0):
-        
+
+    def __init__(
+        self,
+        username: str | None = None,
+        password: str | None = None,
+        mafile_path: str | None = None,
+        steam_id: str | None = None,
+        storage: StorageInterface | None = None,
+        accounts_dir: str = "accounts_info",
+        proxy: dict[str, str] | None = None,
+    ) -> None:
+        """Create account clients using the route resolved by the proxy provider."""
         self.username = username
         self.password = password
         self.mafile_path = mafile_path
         self.steam_id = steam_id
         self.proxy = proxy
-        self.request_delay_sec = request_delay_sec  # Сохраняем задержку
         
         # Инициализация хранилища
         self.storage = storage
@@ -59,23 +58,11 @@ class CookieManager:
             storage=storage
         )
 
-        # Если указано отсутствие прокси, гарантируем прямое соединение для сессии
-        if proxy is None and hasattr(self.client, "_session"):
-            self._enforce_direct_connection(self.client._session)
-
-        # И здесь же монтируем адаптер, если это необходимо
-        if request_delay_sec > 0:
-            adapter = DelayedHTTPAdapter(delay=request_delay_sec)
-            self.client._session.mount('http://', adapter)
-            self.client._session.mount('https://', adapter)
-            logger.debug(f"Для клиента '{username}' установлен HTTP/S адаптер с задержкой {request_delay_sec:.2f} сек.")
-        
         logger.info(f"🍪 Cookie Manager инициализирован для {username}")
         logger.info(f"📁 Сессии: {self.session_file}")
         logger.info(f"📄 MaFile: {mafile_path}")
         if self.proxy:
-            logger.info(f"🌐 Используется прокси: {self.proxy.get('http')}")
-    
+            logger.info(f"Account '{username}' uses its configured proxy")
 
     def dict_to_session_cookies(self, cookies_dict: Dict[str, str], session) -> bool:
         """Загрузка cookies из словаря в сессию"""
@@ -101,31 +88,12 @@ class CookieManager:
                 storage=self.storage
             )
             
-            # Если прокси нет — принудительно прямое соединение (без ENV и старых прокси)
-            if self.proxy is None and hasattr(steam_client, "_session"):
-                self._enforce_direct_connection(steam_client._session)
-
-
-            # Устанавливаем HTTP адаптер с задержкой если она настроена
-            if hasattr(self, 'request_delay_sec') and self.request_delay_sec > 0:
-                adapter = DelayedHTTPAdapter(delay=self.request_delay_sec)
-                steam_client._session.mount('http://', adapter)
-                steam_client._session.mount('https://', adapter)
-                logger.debug(f"Для нового Steam клиента '{self.username}' установлен HTTP адаптер с задержкой {self.request_delay_sec:.2f} сек.")
-            
             logger.info("✅ Steam клиент создан")
             return steam_client
         except Exception:
             log_exception(f"Failed to create Steam client for '{self.username}'.")
             return None
 
-    def _enforce_direct_connection(self, session) -> None:
-        """Отключает любые прокси и ENV-прокси для переданной сессии requests."""
-        if hasattr(session, "trust_env"):  # Страхуем себя от системных прокси
-            session.trust_env = False
-        if hasattr(session, "proxies") and isinstance(session.proxies, dict):
-            session.proxies.clear()
-    
     def _is_session_alive(self) -> bool:
         """Проверка актуальности текущей сессии"""
         if not self.steam_client:
@@ -409,14 +377,23 @@ def initialize_cookie_manager(
     mafile_path: str,
     steam_id: str,
     storage: StorageInterface,
-    accounts_dir: str = 'accounts_info',
-    proxy: Optional[Dict[str, str]] = None,
-    request_delay_sec: float = 0
+    accounts_dir: str = "accounts_info",
+    proxy: dict[str, str] | None = None,
 ) -> "CookieManager":
+    """Create a cookie manager for a configured account.
+
+    Args:
+        username: Steam login name.
+        password: Steam account password.
+        mafile_path: Path to the account Steam Guard file.
+        steam_id: Steam account ID.
+        storage: Account cookie storage.
+        accounts_dir: Directory holding saved sessions.
+        proxy: Account proxy mapping, or None resolved from explicit no_proxy.
+
+    Returns:
+        An account cookie manager with configured Steam clients.
     """
-    Фабричная функция для создания или получения существующего экземпляра CookieManager.
-    """
-    # Просто создаем и возвращаем новый экземпляр со всеми параметрами.
     return CookieManager(
         username=username,
         password=password,
@@ -425,5 +402,4 @@ def initialize_cookie_manager(
         storage=storage,
         accounts_dir=accounts_dir,
         proxy=proxy,
-        request_delay_sec=request_delay_sec
     ) 

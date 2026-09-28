@@ -1,7 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase
 
-from steampy import utils
+from src.steampy import utils
 
 
 class TestUtils(TestCase):

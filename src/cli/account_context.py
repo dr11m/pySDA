@@ -53,11 +53,6 @@ def build_account_context(config_manager: ConfigManager, account_name: str) -> O
         
         logger.info(f"Основные настройки: username={username}, mafile_path={mafile_path}, steam_id={steam_id}")
         
-        # Получаем задержку из конфига и переводим в секунды
-        delay_ms = config_manager.get('min_request_delay_ms', 0)
-        request_delay_sec = delay_ms / 1000.0
-        logger.info(f"Задержка запросов: {delay_ms}ms ({request_delay_sec}s)")
-
         # --- Динамическое создание зависимостей через фабрики ---
         logger.info("Получение конфигурации провайдеров...")
         proxy_provider_config = config_manager.get('proxy_provider')
@@ -65,8 +60,8 @@ def build_account_context(config_manager: ConfigManager, account_name: str) -> O
         
         proxy_provider = create_instance_from_config(proxy_provider_config)
         proxy = proxy_provider.get_proxy(account_name)
-        logger.info(f"Прокси для аккаунта: {proxy}")
-        
+        logger.info(f"Account '{account_name}' route: {'proxy' if proxy is not None else 'direct'}")
+
         storage_config = config_manager.get('cookie_storage')
         logger.info(f"storage_config: {storage_config}")
         storage_instance = create_instance_from_config(storage_config)
@@ -80,7 +75,6 @@ def build_account_context(config_manager: ConfigManager, account_name: str) -> O
             storage=storage_instance,
             accounts_dir=accounts_dir,
             proxy=proxy,
-            request_delay_sec=request_delay_sec
         )
         
         trade_manager = TradeConfirmationManager(

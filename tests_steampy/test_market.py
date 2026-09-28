@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 from unittest import TestCase
 
-from steampy.client import SteamClient
-from steampy.exceptions import TooManyRequests
-from steampy.models import Currency, GameOptions
-from steampy.utils import load_credentials
+from src.steampy.client import SteamClient
+from src.steampy.exceptions import TooManyRequests
+from src.steampy.models import Currency, GameOptions
+from src.steampy.utils import load_credentials
 
 
 @unittest.skip('Requires secrets/Steamguard.txt')

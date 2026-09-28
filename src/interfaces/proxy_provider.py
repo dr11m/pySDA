@@ -1,16 +1,22 @@
+"""Required per-account proxy routes supplied by storage providers."""
+
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
 
 
 class ProxyProviderInterface(ABC):
-    @abstractmethod
-    def get_proxy(self, account_name: str) -> Optional[Dict[str, str]]:
-        """
-        Возвращает прокси для указанного аккаунта.
+    """Resolve account routes without silent direct fallbacks."""
 
-        :param account_name: Имя аккаунта.
-        :return: Словарь с настройками прокси для библиотеки requests
-                 (например, {'http': 'http://...', 'https': 'https://...'}),
-                 или None, если прокси не используется.
+    @abstractmethod
+    def get_proxy(self, account_name: str) -> dict[str, str] | None:
+        """Resolve a configured account route without silent direct fallback.
+
+        Args:
+            account_name: Account whose proxy setting is required.
+
+        Returns:
+            Both HTTP and HTTPS proxy URLs, or None for explicit no_proxy.
+
+        Raises:
+            ValueError: The account setting is missing or empty.
         """
-        ... 
+        ...

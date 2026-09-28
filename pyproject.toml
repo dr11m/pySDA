@@ -1,6 +1,6 @@
 [project]
 name = "pySDA"
-version = "4.1.0"
+version = "5.0.0"
 description = "Автоматический торговый бот для Steam с поддержкой SDA"
 authors = [
     { name = "dr11m", email = "drr111m@gmail.com" }
@@ -50,7 +50,7 @@ dev-dependencies = [
 ]
 
 [project.scripts]
-steam-bot = "main:main"
+steam-bot = "src.cli_interface:run_cli"
 steam-browser = "browser_launcher.cli:main"
 
 [tool.pytest.ini_options]
@@ -59,6 +59,9 @@ pythonpath = ["."]
 [tool.black]
 line-length = 100
 target-version = ['py310']
+
+[tool.ruff]
+line-length = 140
 
 [tool.mypy]
 python_version = "3.10"

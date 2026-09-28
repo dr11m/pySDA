@@ -106,6 +106,10 @@ debug_console_output: true  # Дополнительный вывод DEBUG/INFO
 # Минимальная задержка между запросами (в миллисекундах)
 min_request_delay_ms: 1000
 
+# Обязательные таймауты Steam-запросов, в секундах
+request_connect_timeout_seconds: 10
+request_read_timeout_seconds: 30
+
 # Настройки аккаунтов
 accounts:
   default:
@@ -115,6 +119,10 @@ accounts:
     steam_id: "ваш_steam_id_64"
     api_key: ""  # можете оставить пустым (более не использется для работы)
 ```
+
+Таймауты обязательны и применяются также при `min_request_delay_ms: 0`. Они ограничивают ожидание соединения и данных в сокете, а не суммарное время всей операции.
+
+Провайдер прокси должен содержать настройку для каждого аккаунта: URL прокси или явное `no_proxy`. Отсутствующая/пустая запись и ошибка чтения хранилища не разрешают прямое соединение. При создании клиента дополнительный запрос для проверки прокси не выполняется; настройки из сохранённой `.pkl`-сессии заменяются текущим маршрутом аккаунта, системные прокси игнорируются. В DEBUG-логах записываются начало, завершение/ошибка и длительность запроса без query-параметров и payload.
 
 ### 4️⃣ **Добавление .maFile**
 
@@ -401,6 +409,26 @@ class SQLiteCookieStorage(CookieStorageInterface):
   - Диагностика и решение проблем
 
 
+## Обновление до 5.0.0
+
+Перед обновлением существующего приложения:
+
+1. Добавьте в `config.yaml`:
+
+   ```yaml
+   request_connect_timeout_seconds: 10
+   request_read_timeout_seconds: 30
+   ```
+
+   Сохраните обязательные `min_request_delay_ms` и `check_ip_on_every_steam_request`. Полный шаблон — `config.example.yaml`.
+2. Укажите для каждого аккаунта URL прокси или явное `no_proxy` в выбранном JSON/SQL-провайдере. Пустая/отсутствующая запись теперь означает ошибку настройки. Сбой БД или прокси не переключает аккаунт на direct.
+3. Уберите аргумент `request_delay_sec` из вызовов `CookieManager` и `initialize_cookie_manager()`; задержку задаёт `min_request_delay_ms`. Прямые вызовы `DelayedHTTPAdapter` требуют явных `delay` и `timeout=(connect, read)`.
+4. Импортируйте runtime-классы CLI из их модулей: меню из `src.cli.menus`, обработчики из `src.cli.trade_handlers`, `AutoManager` из `src.cli.auto_manager`. Их реэкспорты из `src.cli` удалены, чтобы исключить циклы импортов. Удалены также `ping_proxy()` и `Config.CHECK_IP_ON_EVERY_STEAM_REQUEST`; сама YAML-настройка проверки IP сохранена.
+
+`SteamClient` по-прежнему использует `config.yaml` в текущем рабочем каталоге. При прямом создании клиента передайте proxy mapping с `http` и `https` или явно выберите direct через `proxies=None`. При загрузке существующего pickle сохранённые прокси и HTTP-адаптеры заменяются текущими настройками. Переменные окружения Requests, включая `HTTP_PROXY`, `HTTPS_PROXY` и `ALL_PROXY`, не задают маршрут клиента.
+
+Таймауты соединения и чтения действуют также при нулевой задержке. Read timeout ограничивает ожидание очередных данных от сокета; это не общий deadline аккаунта. Несколько запросов, редиректы, задержки и повторные попытки увеличивают полное время операции. Debug-логи запросов находятся в `logs/log.log` и содержат начало, завершение/ошибку и длительность без query parameters, cookies и proxy credentials.
+
 ## 🧪 Тестирование
 
 ### 🚀 **Запуск тестов**
@@ -434,7 +462,8 @@ uv run python -m pytest tests/ tests_steampy/ --cov=src
 
 #### 🆕 **Новые тесты** (`tests/`)
 - **`test_error_tracking.py`** - Тестирование системы отслеживания ошибок
-- **`test_proxy_connection.py`** - Тестирование подключения к прокси
+- **`test_steam_http_routing.py`**, **`test_json_proxy_provider.py`**, **`test_sql_proxy_provider.py`** - Офлайн-проверки маршрутов, таймаутов и ошибок прокси
+- **`test_package_metadata.py`** - Проверка console entry points и независимого импорта библиотеки
 - **`demo_error_tracking.py`** - Демонстрация системы отслеживания ошибок
 - **`test_config_manager.py`** - Проверка fail-fast валидации `mafile_path`
 - **`test_logger_setup.py`** - Проверка `log_exception()` и наличия traceback в логе
@@ -456,7 +485,7 @@ uv run python -m pytest tests/ tests_steampy/ --cov=src
 ```bash
 # Тестирование новых функций
 uv run python -m pytest tests/test_error_tracking.py -v
-uv run python -m pytest tests/test_proxy_connection.py -v
+uv run python -m pytest tests/test_steam_http_routing.py tests/test_sql_proxy_provider.py -v
 
 # Тестирование Steam API
 uv run python -m pytest tests_steampy/test_guard.py -v
@@ -484,7 +513,9 @@ uv run python -m pytest tests/ tests_steampy/ --cov=src --cov-report=html
 
 ### ⚠️ **Важные замечания**
 
-- Тесты работают с mock-данными и не требуют реального Steam аккаунта
+- Общий запуск pytest выполняет офлайн-проверки. Существующие Steam integration tests пропускаются, поскольку требуют реальных credentials.
+- Ручные live-сценарии находятся в `scripts/debug_cookies_after_refresh.py`, `scripts/refresh_token_force.py` и `scripts/real_refresh_token_login.py`. Они читают реальные сессии и могут обновлять cookies/БД; запускайте их отдельно только для выбранного диагностического сценария. Они не входят в общий pytest.
+- `tests/test_proxy_connection.py` — отдельный ручной диагностический инструмент; он не содержит pytest-тестов.
 - Перед коммитом рекомендуется запускать все тесты
 - При добавлении нового функционала желательно покрывать его тестами
 
