@@ -6,10 +6,11 @@
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import ClassVar
 
 from dotenv import load_dotenv
 
-from sqlalchemy import create_engine, Column, String, DateTime, Integer, Text, text
+from sqlalchemy import create_engine, Column, Engine, String, DateTime, Integer, Text, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
 
@@ -28,6 +29,17 @@ if not env_path.exists():
 load_dotenv(dotenv_path=env_path)
 
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
+
+# Client keepalives hold NAT mappings open and drop dead links in ~60s, so a silently broken
+# connection is not left behind as an idle server backend until the server's own 2h keepalive.
+PG_CONNECT_ARGS: dict[str, int | str] = {
+    "application_name": "pySDA",
+    "connect_timeout": 10,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+}
 
 
 Base = declarative_base()
@@ -53,6 +65,9 @@ class SqlAlchemyProxyProvider(ProxyProviderInterface):
     Требует наличия переменной окружения DB_CONNECTION_STRING.
     """
 
+    # A provider is built on every account check; one engine per process keeps the PG connection count bounded.
+    _engine: ClassVar[Engine | None] = None
+
     def __init__(self, **kwargs):
         """
         Инициализирует подключение к БД.
@@ -64,36 +79,41 @@ class SqlAlchemyProxyProvider(ProxyProviderInterface):
                 "Невозможно инициализировать SqlAlchemyProxyProvider. "
                 "Добавьте ее в ваш .env файл."
             )
-            
+
         logger.info("🚀 Инициализация SqlAlchemyProxyProvider...")
-        self._setup_engine()
-        
-        # Создаем схему и таблицы
-        self._create_schema_and_tables()
-        
+        if SqlAlchemyProxyProvider._engine is None:
+            engine: Engine = self._create_engine()
+            self._create_schema_and_tables(engine)
+            # Cache only after the schema check succeeds so a failed first start is retried next time.
+            SqlAlchemyProxyProvider._engine = engine
+            logger.debug("Created shared SqlAlchemyProxyProvider engine")
+        self.engine: Engine = SqlAlchemyProxyProvider._engine
+
         self.Session = sessionmaker(bind=self.engine)
         logger.info("✅ SqlAlchemyProxyProvider успешно инициализирован.")
 
-    def _create_schema_and_tables(self):
+    @staticmethod
+    def _create_schema_and_tables(engine: Engine) -> None:
         """Создает схему steam_accounts и все необходимые таблицы."""
         try:
             # Создаем схему, если её нет
-            with self.engine.connect() as connection:
+            with engine.connect() as connection:
                 connection.execute(text("CREATE SCHEMA IF NOT EXISTS steam_accounts"))
                 connection.commit()
                 logger.info("✅ Схема 'steam_accounts' создана/проверена")
-            
+
             # Создаем все таблицы
-            Base.metadata.create_all(self.engine)
+            Base.metadata.create_all(engine)
             logger.info("✅ Таблицы в схеме 'steam_accounts' созданы/проверены")
-            
+
         except Exception as e:
             logger.error(f"❌ Ошибка создания схемы/таблиц: {e}")
             raise
 
-    def _setup_engine(self):
+    @staticmethod
+    def _create_engine() -> Engine:
         """Настройка SQLAlchemy engine с пулом соединений."""
-        self.engine = create_engine(
+        return create_engine(
             DB_CONNECTION_STRING,
             poolclass=QueuePool,
             pool_size=2,
@@ -101,6 +121,7 @@ class SqlAlchemyProxyProvider(ProxyProviderInterface):
             pool_pre_ping=True,
             pool_recycle=3600,
             echo=False,
+            connect_args=PG_CONNECT_ARGS,
         )
 
     def get_proxy(self, account_name: str) -> dict[str, str] | None:

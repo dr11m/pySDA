@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![Status](https://img.shields.io/badge/status-active-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-4.1.0-green.svg)
+![Version](https://img.shields.io/badge/version-5.0.1-green.svg)
 
 > **pySDA - CLI бот для автоматизации Steam подтверждений. Автоматически принимает бесплатные трейды и подарки, подтверждает операции через Steam Guard (весь функционал классического SDA и больше), обрабатывает market ордера, управляет сессиями с автообновлением cookies, запускает изолированные браузерные профили с автозаливкой cookies, выбором прокси и расширений.**
 
