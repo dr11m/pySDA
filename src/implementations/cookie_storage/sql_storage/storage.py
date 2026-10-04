@@ -5,10 +5,10 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import ClassVar, Dict, Optional
 
 from dotenv import load_dotenv
-from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine, text
+from sqlalchemy import Column, DateTime, Engine, Integer, String, Text, create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 
@@ -25,6 +25,17 @@ if not env_path.exists():
 
 load_dotenv(dotenv_path=env_path)
 DB_CONNECTION_STRING = os.getenv("DB_CONNECTION_STRING")
+
+# Client keepalives hold NAT mappings open and drop dead links in ~60s, so a silently broken
+# connection is not left behind as an idle server backend until the server's own 2h keepalive.
+PG_CONNECT_ARGS: dict[str, int | str] = {
+    "application_name": "pySDA",
+    "connect_timeout": 10,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+}
 
 Base = declarative_base()
 
@@ -52,6 +63,9 @@ class SteamAccount(Base):
 class SqlAlchemyCookieStorage(CookieStorageInterface):
     """Persist account cookies in PostgreSQL via SQLAlchemy."""
 
+    # A storage is built on every account check; one engine per process keeps the PG connection count bounded.
+    _engine: ClassVar[Engine | None] = None
+
     def __init__(self, **kwargs):
         if not DB_CONNECTION_STRING:
             raise ValueError(
@@ -60,14 +74,20 @@ class SqlAlchemyCookieStorage(CookieStorageInterface):
             )
 
         logger.info("Initializing SqlAlchemyCookieStorage...")
-        self._setup_engine()
-        self._create_schema_and_tables()
+        if SqlAlchemyCookieStorage._engine is None:
+            engine: Engine = self._create_engine()
+            self._create_schema_and_tables(engine)
+            # Cache only after the schema check succeeds so a failed first start is retried next time.
+            SqlAlchemyCookieStorage._engine = engine
+            logger.debug("Created shared SqlAlchemyCookieStorage engine")
+        self.engine: Engine = SqlAlchemyCookieStorage._engine
         self.Session = sessionmaker(bind=self.engine)
         logger.info("SqlAlchemyCookieStorage initialized.")
 
-    def _setup_engine(self) -> None:
+    @staticmethod
+    def _create_engine() -> Engine:
         """Configure SQLAlchemy engine and connection pool."""
-        self.engine = create_engine(
+        return create_engine(
             DB_CONNECTION_STRING,
             poolclass=QueuePool,
             pool_size=2,
@@ -75,16 +95,18 @@ class SqlAlchemyCookieStorage(CookieStorageInterface):
             pool_pre_ping=True,
             pool_recycle=3600,
             echo=False,
+            connect_args=PG_CONNECT_ARGS,
         )
 
-    def _create_schema_and_tables(self) -> None:
+    @staticmethod
+    def _create_schema_and_tables(engine: Engine) -> None:
         """Create schema and tables if they do not exist."""
         try:
-            with self.engine.connect() as connection:
+            with engine.connect() as connection:
                 connection.execute(text("CREATE SCHEMA IF NOT EXISTS steam_accounts"))
                 connection.commit()
                 logger.info("Schema 'steam_accounts' verified.")
-            Base.metadata.create_all(self.engine)
+            Base.metadata.create_all(engine)
             logger.info("Tables in schema 'steam_accounts' verified.")
         except Exception:
             log_exception("Failed to create SQL schema or tables for cookie storage.")
