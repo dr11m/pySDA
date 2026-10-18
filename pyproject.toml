@@ -24,6 +24,8 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "ruamel-yaml>=0.18.14",
     "playwright>=1.62.0",
+    "cryptography>=50.0.2",
+    "keyring>=25.7.0",
 ]
 
 [project.optional-dependencies]
