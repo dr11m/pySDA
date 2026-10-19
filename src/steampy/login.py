@@ -57,7 +57,7 @@ class LoginExecutor:
             return self.session, self.refresh_token
         
         except Exception as e:
-            print(f"❌ Ошибка в login: {e}")
+            logger.warning(f"Credential login failed for '{self.username}': {type(e).__name__}")
             print(f"📋 Доступные cookies: {list(self.session.cookies.get_dict().keys())}")
             raise
 
@@ -132,7 +132,7 @@ class LoginExecutor:
             else:
                 raise Exception('Cannot update Steam guard')
         except Exception as e:
-            logger.error(f"❌ Ошибка в _update_steam_guard для {self.username}: {e} | Steam response: {login_response.json()}")
+            logger.error(f"Steam Guard login step failed for '{self.username}': {type(e).__name__}")
             raise
 
     def _pool_sessions_steam(self, client_id: str, request_id: str) -> None:
@@ -141,7 +141,7 @@ class LoginExecutor:
             response = self._api_call('POST', 'IAuthenticationService', 'PollAuthSessionStatus', params=pool_data)
             self.refresh_token = response.json()['response']['refresh_token']
         except Exception as e:
-            print(f"❌ Ошибка в _pool_sessions_steam: {e}")
+            logger.warning(f"Auth session polling failed for '{self.username}': {type(e).__name__}")
             raise
 
     def get_web_cookies(self, refresh_token: str, steam_id: str) -> List[str]:
@@ -463,15 +463,15 @@ class LoginExecutor:
                         cookie += f'; Domain={result_domain}'
                     cookies.append(cookie)
 
-                print(f"✅ Successfully got cookies from {url}")
+                logger.debug(f"Cookie transfer completed for '{self.username}': host={urlparse(url).hostname}")
                 break  # Успех - выходим из цикла повторов
-                
+
             except Exception as ex:
                 if attempt == ATTEMPT_COUNT - 1:
-                    print(f"[ERROR] All {ATTEMPT_COUNT} attempts failed for {url}: {ex}")
+                    logger.error(f"Cookie transfer failed for '{self.username}' after {ATTEMPT_COUNT} attempts: {type(ex).__name__}")
                     raise ex
-                
-                print(f"[DEBUG] Attempt {attempt + 1}/{ATTEMPT_COUNT} failed for {url}: {ex}")
+
+                logger.debug(f"Cookie transfer attempt {attempt + 1}/{ATTEMPT_COUNT} failed for '{self.username}': {type(ex).__name__}")
 
         return cookies
 
@@ -552,7 +552,5 @@ class LoginExecutor:
                 secure=True
             )
             print(f"✅ Добавлен новый sessionid для {domain}")
-        
-        print(f"🎯 Обновлено {len(domains)} доменов с sessionid={session_id[:8]}...")
 
-
+        logger.debug(f"Updated session cookies for '{self.username}': domains={len(domains)}")

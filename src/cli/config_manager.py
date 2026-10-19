@@ -7,6 +7,8 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import copy
+import os
+import tempfile
 
 from .constants import Config, Messages
 from .display_formatter import DisplayFormatter
@@ -25,6 +27,30 @@ class ConfigManager:
         self.selected_account_name = None
         self.current_account_config = {}
         self.yaml = YAML()
+
+    def update_account_password(self, account_name: str, password: str) -> None:
+        """Atomically persist one account password while preserving other settings."""
+        config_path: Path = Path(self.config_path)
+        with config_path.open(encoding="utf-8") as source:
+            document: Dict[str, Any] = self.yaml.load(source)
+        account: Dict[str, Any] = document["accounts"][account_name]
+        if account["password"] != self.accounts_settings[account_name]["password"]:
+            raise ValueError("The account password changed on disk; reload the config first")
+        account["password"] = password
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=config_path.parent, delete=False) as output:
+                temporary_path = Path(output.name)
+                os.chmod(temporary_path, config_path.stat().st_mode & 0o777)
+                self.yaml.dump(document, output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary_path, config_path)
+        finally:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+        self.accounts_settings[account_name]["password"] = password
+        self.config_data["accounts"][account_name]["password"] = password
 
     def clone(self) -> 'ConfigManager':
         """Создает и возвращает клон текущего экземпляра ConfigManager."""

@@ -9,8 +9,11 @@ import decimal
 import requests
 from typing import Union
 import pickle
+import tempfile
+from pathlib import Path
 from contextlib import contextmanager
 import yaml
+from pydantic import ValidationError
 
 from . import guard
 from .confirmation import ConfirmationExecutor
@@ -20,6 +23,7 @@ from .market import SteamMarket
 from .models import Asset, GameOptions, SteamUrl, TradeOfferState
 from .models import STEAM_URL, EResult
 from .session_check import check_session_static as is_market_session_alive
+from .security import SessionRevocationStatus, SteamSecurityResponse, account_session_id
 from src.utils.delayed_http_adapter import DelayedHTTPAdapter, SteamHttpSettings
 
 
@@ -280,20 +284,113 @@ class SteamClient:
         return is_market_session_alive(username, _session)
 
     @login_required
-    def save_session(self, path, username):
-        with open(os.path.join(path, f'{username}.pkl'), 'wb') as f:
-            pickle.dump((self._session, self.refresh_token), f)
-        print(f"💾 Сессия и refresh токен сохранены в pkl для {username}")
-        
-        # Обновляем cookies в БД через implementations
+    def save_session(self, path: str, username: str) -> bool:
+        """Atomically save the session and report whether cookie storage was updated."""
+        session_file: Path = Path(path) / f"{username}.pkl"
+        temporary_path: Path | None = None
         try:
-            cookies_dict = session_to_dict(self._session)
-            if self.storage.save_cookies(username, cookies_dict):
-                logger.info(f"💾 Cookies обновлены в БД при сохранении сессии для {username}")
-            else:
-                logger.warning(f"⚠️ Не удалось обновить cookies в БД при сохранении сессии для {username}")
-        except Exception as e:
-            logger.error(f"❌ Ошибка обновления cookies в БД при сохранении сессии для {username}: {e}")
+            with tempfile.NamedTemporaryFile(mode="wb", dir=session_file.parent, delete=False) as output:
+                temporary_path = Path(output.name)
+                os.chmod(temporary_path, 0o600)
+                pickle.dump((self._session, self.refresh_token), output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary_path, session_file)
+            if self.storage is None:
+                return True
+            try:
+                saved: bool = self.storage.save_cookies(username, session_to_dict(self._session))
+                if not saved:
+                    logger.warning(f"Cookie storage did not confirm saving the session for '{username}'")
+                return saved
+            except Exception as error:
+                logger.error(f"Failed to persist cookies for '{username}': {type(error).__name__}")
+                return False
+        finally:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+
+    def set_password(self, password: str) -> None:
+        """Use an updated password on the next full login."""
+        self._password = password
+
+    def login_with_password(self, password: str) -> bool:
+        """Verify a password with one fresh credential login and adopt only a matching account session."""
+        fresh_session: requests.Session = requests.Session()
+        fresh_session.trust_env = False
+        fresh_session.proxies = self._session.proxies.copy()
+        adapter: DelayedHTTPAdapter = DelayedHTTPAdapter(
+            delay=self._http_settings.min_request_delay_ms / 1000.0,
+            timeout=self.request_timeout,
+            username=self.username,
+        )
+        fresh_session.mount("http://", adapter)
+        fresh_session.mount("https://", adapter)
+        try:
+            session, refresh_token = LoginExecutor(
+                self.steam_id, self.username, password, self.steam_guard["shared_secret"], fresh_session
+            ).login()
+            if not account_session_id(session, self.steam_id, "https://store.steampowered.com/twofactor/manage_action"):
+                fresh_session.close()
+                logger.error(f"Password verification returned mismatched account cookies for '{self.username}'")
+                return False
+        except Exception as error:
+            fresh_session.close()
+            logger.warning(f"Password verification could not complete for '{self.username}': {type(error).__name__}")
+            return False
+        self._session.close()
+        self._session = session
+        self.refresh_token = refresh_token
+        self._password = password
+        self.was_login_executed = True
+        self.market = SteamMarket(session, self.steam_id)
+        self.market._set_login_executed(self.steam_guard, self._get_session_id())
+        if self._http_settings.check_ip_on_every_steam_request:
+            self._wrap_session_methods()
+        return True
+
+    def revoke_all_sessions(self) -> SessionRevocationStatus:
+        """Submit Steam's account-wide deauthorization once without refreshing or following redirects."""
+        session_id: str | None = account_session_id(self._session, self.steam_id, "https://store.steampowered.com/twofactor/manage_action")
+        if not session_id:
+            logger.warning(f"Session revocation refused for '{self.username}': missing or mismatched account cookies")
+            return SessionRevocationStatus.REJECTED
+        try:
+            response: requests.Response = self._session.post(
+                "https://store.steampowered.com/twofactor/manage_action",
+                data={"sessionid": session_id, "action": "deauthorize"},
+                headers={"Referer": "https://store.steampowered.com/twofactor/manage"},
+                timeout=self.request_timeout,
+                allow_redirects=False,
+            )
+        except (requests.RequestException, ValueError):
+            logger.warning(f"Session revocation outcome is unknown for '{self.username}'; the request will not be retried")
+            return SessionRevocationStatus.UNKNOWN
+        logger.info(f"Session revocation response for '{self.username}': HTTP {response.status_code}")
+        if response.status_code in {302, 303}:
+            location: str = response.headers.get("Location", "")
+            try:
+                target: urlparse.SplitResult = urlparse.urlsplit(urlparse.urljoin(response.url, location))
+            except ValueError:
+                return SessionRevocationStatus.UNKNOWN
+            if target.scheme != "https" or target.netloc != "store.steampowered.com":
+                return SessionRevocationStatus.UNKNOWN
+            if target.path.startswith("/login"):
+                return SessionRevocationStatus.REJECTED
+            if target.query or target.fragment:
+                return SessionRevocationStatus.UNKNOWN
+            if target.path.rstrip("/") == "/twofactor/manage":
+                return SessionRevocationStatus.CONFIRMED
+            return SessionRevocationStatus.UNKNOWN
+        if response.status_code == 200:
+            try:
+                result: SteamSecurityResponse = SteamSecurityResponse.model_validate_json(response.content)
+            except ValidationError:
+                return SessionRevocationStatus.UNKNOWN
+            return SessionRevocationStatus.CONFIRMED if result.confirmed else SessionRevocationStatus.REJECTED
+        if 400 <= response.status_code < 500:
+            return SessionRevocationStatus.REJECTED
+        return SessionRevocationStatus.UNKNOWN
 
     @login_required
     def logout(self) -> None:
