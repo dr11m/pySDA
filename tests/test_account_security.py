@@ -55,7 +55,7 @@ def _password_changer(tmp_path: Path) -> PasswordChanger:
     context: Any = SimpleNamespace(account_name="selected_alias", username="steam_login", config_manager=config, cookie_manager=manager)
     changer: PasswordChanger = PasswordChanger(context)
     changer.steam_client = manager.steam_client
-    changer.recovery_params = {"s": "test-recovery", "account": "steam_login", "reset": "1", "lost": "2", "issueid": "1"}
+    changer.recovery_params = {"s": "test-recovery", "account": "steam_login", "reset": "1", "lost": "0", "issueid": "406"}
     return changer
 
 
@@ -386,6 +386,53 @@ def test_password_wizard_sends_csrf_for_help_instead_of_store(tmp_path: Path) ->
     changer.steam_client._session.cookies.set("sessionid", "different-store-session", domain="store.steampowered.com")
     assert changer._send_recovery_request() is True
     assert parse_qs(adapter.requests[0].body)["sessionid"] == ["help-session"]
+
+
+@pytest.mark.parametrize("method", ["_get_next_step", "_verify_old_password"])
+def test_password_wizard_preserves_native_change_route(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str) -> None:
+    """A normal password change must not replace Steam's lost=0 with the old hardcoded lost=2."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    adapter: _SteamResponseAdapter = _SteamResponseAdapter(200, b'{"success":true}')
+    changer.steam_client._session.mount("https://", adapter)
+    monkeypatch.setattr(changer, "_get_rsa_key", lambda: {"timestamp": "10"})
+    monkeypatch.setattr(changer, "_encrypt_password", lambda password, key: "ciphertext")
+    assert getattr(changer, method)() is True
+    payload: dict[str, list[str]] = parse_qs(adapter.requests[0].body)
+    assert payload["lost"] == ["0"]
+    assert payload["reset"] == ["1"]
+
+
+@pytest.mark.parametrize("reset,lost", [("0", "0"), ("1", "2"), ("1", "8"), ("", "0")])
+def test_password_change_refuses_recovery_route_before_any_submission(tmp_path: Path, reset: str, lost: str) -> None:
+    """The CLI must not submit a password under a lost-access or unknown wizard route."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    adapter: _SteamResponseAdapter = _SteamResponseAdapter(200, b'{"success":true}')
+    changer.steam_client._session.mount("https://", adapter)
+    changer.recovery_params["reset"] = reset
+    changer.recovery_params["lost"] = lost
+    assert changer._set_new_password("new-password") is False
+    assert not adapter.requests
+
+
+@pytest.mark.parametrize("link_mode,expected", [("native", True), ("lost-access", False), ("missing", False)])
+def test_password_initialization_requires_native_change_link(tmp_path: Path, link_mode: str, expected: bool) -> None:
+    """Read the exact route from the native link instead of inventing missing flags."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    fixture: Path = Path(__file__).parents[1] / "scripts/fixtures/steam_password_change.link.sanitized.html"
+    html: str = fixture.read_text(encoding="utf-8")
+    if link_mode == "lost-access":
+        html = html.replace("lost=0", "lost=2")
+    elif link_mode == "missing":
+        html = "<p>No recognized continuation</p>"
+    response: requests.Response = requests.Response()
+    response.status_code = 200
+    response._content = ("steam_login\n" + html).encode()
+    response.url = "https://help.steampowered.com/en/wizard/HelpWithLoginInfoSendCode/?s=REDACTED&account=REDACTED&reset=1&issueid=406"
+    response.history = [requests.Response()]
+    changer.steam_client._session.get = lambda *args, **kwargs: response
+    assert changer._initialize_recovery(changer.steam_client.steam_id) is expected
+    if expected:
+        assert changer.recovery_params["lost"] == "0"
 
 
 @pytest.mark.parametrize(

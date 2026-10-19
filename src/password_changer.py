@@ -18,6 +18,7 @@ import time
 import urllib.parse
 import re
 from getpass import getpass
+from bs4 import BeautifulSoup
 from pydantic import ValidationError
 from typing import Optional, Dict, Any, Union, List
 from .cli.constants import Messages
@@ -134,7 +135,7 @@ class PasswordChanger:
         self.http_helper: HttpRequestHelper = HttpRequestHelper()
         self.username: str = account_context.account_name
         self.steam_client: Optional[SteamClient] = None
-        
+
         # Параметры для восстановления (эквивалент PasswordChangeParams)
         self.recovery_params: Dict[str, str] = {}
 
@@ -144,6 +145,16 @@ class PasswordChanger:
         if not session_id:
             raise ValueError("Missing or mismatched Steam Help session")
         return session_id
+
+    def _has_password_change_route(self) -> bool:
+        """Allow only the authenticated password-change route observed in Steam's own wizard."""
+        return (
+            self.recovery_params.get("reset") == "1"
+            and self.recovery_params.get("lost") == "0"
+            and self.recovery_params.get("issueid") == "406"
+            and bool(self.recovery_params.get("s"))
+            and bool(self.recovery_params.get("account"))
+        )
 
     def change_password(self, account_context: AccountContext) -> bool:
         """
@@ -250,6 +261,9 @@ class PasswordChanger:
             # Шаг 1: Получение параметров смены пароля (аналог _receive_password_change_params)
             print_and_log("🔄 Получение параметров смены пароля...")
             if not self._initialize_recovery(steam_id):
+                return False
+            if not self._has_password_change_route():
+                print_and_log("❌ Steam вернул другой сценарий восстановления. Смена пароля остановлена.")
                 return False
             
             # Шаг 2: Переход к вводу кода (аналог HelpWithLoginInfoEnterCode)
@@ -399,58 +413,58 @@ class PasswordChanger:
                 return False
 
             # Проверяем, не перенаправило ли снова на логин
-            if '/login' in response.url:
+            if "/login" in response.url:
                 print_and_log("❌ Steam снова перенаправил на страницу входа")
                 print_and_log("💡 Возможные причины:")
                 print_and_log("  • Сессия истекла")
                 print_and_log("  • Нет авторизации для операций восстановления")
                 print_and_log("  • Требуется повторный вход в аккаунт")
                 return False
-            
+
             # Проверяем редиректы (как в оригинальном коде)
             if response.history:
                 print_and_log("✅ Обнаружен редирект, извлекаем параметры из URL...")
-                
-                final_url = response.url
-                parsed_url = urllib.parse.urlparse(final_url)
-                query_params = urllib.parse.parse_qs(parsed_url.query)
 
-                print_and_log("🔍 Параметры перенаправления получены.")
-
-                # Извлекаем параметры по образцу PasswordChangeParams
                 try:
-                    self.recovery_params = {
-                        's': query_params.get('s', [None])[0],  # ID сессии восстановления
-                        'account': query_params.get('account', [None])[0],  # Имя аккаунта
-                        'reset': query_params.get('reset', [None])[0],  # Флаг сброса
-                        'issueid': query_params.get('issueid', [None])[0],  # ID проблемы
-                        'lost': query_params.get('lost', ['0'])[0]  # Флаг потерянного доступа
-                    }
-
-                    print_and_log("🔍 Параметры восстановления получены.")
-
-                    # Проверяем, что все обязательные параметры есть
-                    if all(v is not None for k, v in self.recovery_params.items() if k != "lost"):
-                        print_and_log("✅ Процесс восстановления инициализирован.")
-                        return True
-                    else:
-                        print_and_log("❌ Не все обязательные параметры найдены в редиректе")
+                    page: BeautifulSoup = BeautifulSoup(response.text, "html.parser")
+                    continuation_urls: list[str] = [
+                        urllib.parse.urljoin(response.url, anchor["href"])
+                        for anchor in page.find_all("a", href=True)
+                        if urllib.parse.urlparse(urllib.parse.urljoin(response.url, anchor["href"])).path
+                        == urllib.parse.urlparse(SteamUrls.ENTER_CODE).path
+                    ]
+                    if len(continuation_urls) != 1:
+                        print_and_log("❌ Steam не выдал однозначную ссылку продолжения смены пароля.")
                         return False
-                        
+                    continuation: urllib.parse.ParseResult = urllib.parse.urlparse(continuation_urls[0])
+                    if continuation.scheme != "https" or continuation.netloc != "help.steampowered.com":
+                        return False
+                    query_params: dict[str, list[str]] = urllib.parse.parse_qs(continuation.query)
+                    required_fields: tuple[str, ...] = ("s", "account", "reset", "issueid", "lost")
+                    if any(len(query_params.get(key, [])) != 1 for key in required_fields):
+                        print_and_log("❌ Steam не выдал обязательные параметры смены пароля.")
+                        return False
+                    self.recovery_params = {key: query_params[key][0] for key in required_fields}
+                    if not self._has_password_change_route():
+                        print_and_log("❌ Steam выдал сценарий восстановления или неизвестный режим. Продолжение остановлено.")
+                        return False
+                    print_and_log("✅ Получен штатный сценарий смены пароля: lost=0.")
+                    return True
+
                 except Exception as e:
                     print_and_log(f"❌ Ошибка извлечения параметров из редиректа: {type(e).__name__}")
                     return False
-            
+
             # Если редиректа не было, проверяем HTML на ошибки (как в оригинальном коде)
             html_content = response.text
             print_and_log("🔍 Редиректа не было, анализируем HTML...")
-            
+
             # Ищем ошибки в HTML (аналог page.cssselect('#error_description'))
             error_patterns = [
                 r'<div[^>]*id=["\']error_description["\'][^>]*>([^<]+)</div>',
                 r'<div[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</div>',
             ]
-            
+
             for pattern in error_patterns:
                 error_match = re.search(pattern, html_content, re.IGNORECASE)
                 if error_match:
@@ -661,6 +675,8 @@ class PasswordChanger:
             bool: True если следующий шаг получен успешно
         """
         try:
+            if not self._has_password_change_route():
+                return False
             url = SteamUrls.GET_NEXT_STEP
             data = {
                 'sessionid': self._help_session_id(url),  # ID сессии Steam
@@ -669,7 +685,7 @@ class PasswordChanger:
                 'account': self.recovery_params['account'],  # Имя аккаунта
                 'reset': self.recovery_params['reset'],  # Флаг сброса
                 'issueid': self.recovery_params['issueid'],  # ID проблемы
-                'lost': '2'  # Переключаем на lost=2 для следующих шагов
+                'lost': self.recovery_params['lost']
             }
             
             response = self.steam_client._session.post(url, data=data)
@@ -695,6 +711,8 @@ class PasswordChanger:
             bool: True если пароль верифицирован успешно
         """
         try:
+            if not self._has_password_change_route():
+                return False
             # Получаем текущий пароль
             account_config = self.account_context.config_manager.accounts_settings.get(self.username, {})
             current_password = account_config.get('password', '')
@@ -716,8 +734,8 @@ class PasswordChanger:
             data = {
                 'sessionid': self._help_session_id(url),  # ID сессии Steam
                 's': self.recovery_params['s'],  # ID сессии восстановления
-                'lost': '2',  # Флаг потерянного доступа
-                'reset': '1',  # Флаг сброса
+                'lost': self.recovery_params['lost'],
+                'reset': self.recovery_params['reset'],
                 'password': encrypted_password,  # Зашифрованный текущий пароль
                 'rsatimestamp': rsa_key['timestamp']  # Временная метка RSA ключа
             }
@@ -748,6 +766,9 @@ class PasswordChanger:
             bool: True если пароль установлен успешно
         """
         try:
+            if not self._has_password_change_route():
+                print_and_log("❌ Запрос смены пароля остановлен: сценарий восстановления или неизвестные параметры Steam.")
+                return False
             # Проверяем доступность пароля
             if not self._check_password_available(new_password):
                 return False
@@ -980,14 +1001,15 @@ class PasswordChanger:
         print_and_log("  • Смена пароля может затронуть работу бота")
         print_and_log("  • Убедитесь, что у вас есть доступ к мобильному приложению Steam Guard")
         print_and_log("  • После смены пароля может потребоваться повторная настройка")
+        print_and_log("  • Отсутствие ограничений торговли после этой CLI-команды ещё не проверено на реальном аккаунте.")
         print_and_log(
-            "  • Этот сценарий использует Steam Help: сброс может ограничить торговлю на 5 дней, а для неактивного аккаунта — на 30 дней."
+            "  • При сбросе забытого пароля Steam ограничивает торговлю и Market на 5 дней, а после долгой неактивности — на 30 дней."
         )
         print_and_log("")
-        
+
         while True:
             choice: str = input("Продолжить смену пароля? (y/N): ").lower().strip()
-            if choice in ('y', 'yes', 'да', 'д'):
+            if choice in ("y", "yes", "да", "д"):
                 return True
             elif choice in ('n', 'no', 'нет', 'н', ''):
                 print_and_log("Отменено.")
