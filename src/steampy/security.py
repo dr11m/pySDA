@@ -32,6 +32,22 @@ class SteamRecoveryResponse(BaseModel):
     errorMsg: str | None = None
 
 
+class SteamPasswordAvailabilityResponse(BaseModel):
+    """Require the boolean availability field observed in Steam's response."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(strict=True, hide_input_in_errors=True)
+
+    available: StrictBool
+
+
+class SteamRsaKeyResponse(SteamSecurityResponse):
+    """Require the complete RSA key before attempting password encryption."""
+
+    publickey_mod: str
+    publickey_exp: str
+    timestamp: str
+
+
 class SteamPasswordChangeResponse(SteamRecoveryResponse):
     """Parse the navigation or acknowledgement returned by Steam's password wizard."""
 

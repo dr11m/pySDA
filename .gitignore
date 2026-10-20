@@ -182,6 +182,7 @@ cython_debug/
 
 accounts_info/*
 config.yaml
+config.yaml.lock
 logs/*
 browser_profiles/
 debug_apikey_page.html

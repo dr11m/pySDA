@@ -177,8 +177,10 @@ class SteamClient:
 
             self._session = login_executor.session
 
+            if not self.check_account_session():
+                self.was_login_executed = False
+                return False
             self.was_login_executed = True
-
 
             # Сохраняем сессию
             self.save_session(os.path.dirname(self.session_path), self.username)
@@ -187,11 +189,6 @@ class SteamClient:
             logger.debug(f"Session after refresh: account={self.username} cookies={len(self._session.cookies)}")
 
             logger.info(f"✅ Сессия обновлена через refresh токен для {self.username}")
-            
-            # Проверяем сессию
-            if not self.check_session_static(self.username, self._session):
-                logger.info(f"❌ Сессия была обновлена через refresh token, но не прошла проверку {self.username})")
-                return False
             
             return True
             
@@ -226,19 +223,20 @@ class SteamClient:
 
         return proxies
 
-    def login_if_need_to(self):        
-        if self.was_login_executed:
+    def login_if_need_to(self) -> None:
+        if self.was_login_executed and self.is_session_owned():
             logger.info(f"✅ Login already executed for {self.username}, skipping check")
             return
         
-        if not self.check_session_static(self.username, self._session):
+        self.was_login_executed = False
+        if not self.check_account_session():
             self.update_session()
         else:
             logger.info(f"✅ Сессия активна для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
 
-    def update_session(self):
+    def update_session(self) -> None:
         """
         Логика метода update_session теперь следующая:
         Получение cookies для всех доменов (community, store, help) происходит через refresh_token.
@@ -256,6 +254,7 @@ class SteamClient:
 
         """
         
+        self.was_login_executed = False
         # Устанавливаем быструю задержку для всех авторизационных запросов
         with self.temporary_delay(1):  # или какое значение вы хотите
             # Сначала пробуем обновить через refresh token
@@ -270,6 +269,10 @@ class SteamClient:
             session, refresh_token = LoginExecutor(self.steam_id, self.username, self._password, self.steam_guard['shared_secret'], self._session).login()
             self.refresh_token = refresh_token
             self._session = session
+            if not self.is_session_owned():
+                self.refresh_token = None
+                self._session.cookies.clear()
+                raise InvalidCredentials("Steam login did not authenticate the configured account")
             print(f"💾 Получен новый refresh токен для {self.username}")
             self.was_login_executed = True
             self.market._set_login_executed(self.steam_guard, self._get_session_id())
@@ -277,6 +280,16 @@ class SteamClient:
             self.save_session(os.path.dirname(self.session_path), self.username)
             logger.info(f"💾 Сессия сохранена в pkl и в хранилище для {self.username}")
 
+    def is_session_owned(self) -> bool:
+        """Check the account identity sent to the community before enabling operations."""
+        return self.steam_id is not None and account_session_id(self._session, self.steam_id, SteamUrl.COMMUNITY_URL) is not None
+
+    def check_account_session(self) -> bool:
+        """Require both the configured account identity and a live market session."""
+        if not self.is_session_owned():
+            logger.warning(f"Steam session ownership check failed: account={self.username}")
+            return False
+        return self.check_session_static(self.username, self._session)
 
     @staticmethod
     def check_session_static(username, _session) -> bool:
@@ -368,19 +381,6 @@ class SteamClient:
             return SessionRevocationStatus.UNKNOWN
         logger.info(f"Session revocation response for '{self.username}': HTTP {response.status_code}")
         if response.status_code in {302, 303}:
-            location: str = response.headers.get("Location", "")
-            try:
-                target: urlparse.SplitResult = urlparse.urlsplit(urlparse.urljoin(response.url, location))
-            except ValueError:
-                return SessionRevocationStatus.UNKNOWN
-            if target.scheme != "https" or target.netloc != "store.steampowered.com":
-                return SessionRevocationStatus.UNKNOWN
-            if target.path.startswith("/login"):
-                return SessionRevocationStatus.REJECTED
-            if target.query or target.fragment:
-                return SessionRevocationStatus.UNKNOWN
-            if target.path.rstrip("/") == "/twofactor/manage":
-                return SessionRevocationStatus.CONFIRMED
             return SessionRevocationStatus.UNKNOWN
         if response.status_code == 200:
             try:

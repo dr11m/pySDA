@@ -59,6 +59,55 @@ def _password_changer(tmp_path: Path) -> PasswordChanger:
     return changer
 
 
+@pytest.mark.parametrize(("choice", "expected"), [("y", True), ("да", True), ("n", False), ("", False)])
+def test_password_change_previews_exact_password_before_confirmation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    choice: str,
+    expected: bool,
+) -> None:
+    """Use visible password entry, preview it before consent, and honor cancellation without logging secrets."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    new_password: str = "Exact-New42! "
+    previews: list[str] = []
+    submitted: list[str] = []
+    log_messages: list[str] = []
+    answers: list[str] = [new_password, new_password, choice]
+    monkeypatch.setattr(changer.account_context.cookie_manager, "get_steam_client", lambda: changer.steam_client)
+    monkeypatch.setattr(changer, "_verify_current_session", lambda: True)
+    monkeypatch.setattr(changer, "_verify_steam_guard_data", lambda: True)
+
+    def hidden_input(prompt: str) -> str:
+        pytest.fail("Password entry must be visible")
+
+    def read_visible_input(prompt: str) -> str:
+        if len(answers) == 1:
+            previews.append(capsys.readouterr().out)
+        return answers.pop(0)
+
+    def change_remotely(password: str) -> bool:
+        submitted.append(password)
+        return True
+
+    monkeypatch.setattr("src.password_changer.getpass", hidden_input, raising=False)
+    monkeypatch.setattr("builtins.input", read_visible_input)
+    monkeypatch.setattr(changer, "_change_password_full_process", change_remotely)
+    sink_id: int = logger.add(lambda message: log_messages.append(str(message)))
+    try:
+        assert changer.execute() is expected
+    finally:
+        logger.remove(sink_id)
+
+    assert len(previews) == 1
+    assert f"Новый пароль: {new_password}\n" in previews[0]
+    assert "selected_alias" in previews[0]
+    assert new_password not in "\n".join(log_messages)
+    assert submitted == ([new_password] if expected else [])
+    on_disk: dict[str, Any] = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
+    assert on_disk["accounts"]["selected_alias"]["password"] == (new_password if expected else "old-password")
+
+
 @pytest.mark.parametrize("body", [b"<html>Sign in</html>", b"{}", b'{"success":false}', b'{"success":0}'])
 def test_password_change_rejects_unconfirmed_http_200(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: bytes) -> None:
     """A login page or an explicit failure must not overwrite the password."""
@@ -283,8 +332,8 @@ def test_session_save_failure_preserves_existing_pickle_and_reports_failure(tmp_
 @pytest.mark.parametrize(
     "status,body,location,expected",
     [
-        (302, b"", "/twofactor/manage", SessionRevocationStatus.CONFIRMED),
-        (302, b"", "/login/", SessionRevocationStatus.REJECTED),
+        (302, b"", "/twofactor/manage", SessionRevocationStatus.UNKNOWN),
+        (302, b"", "/login/", SessionRevocationStatus.UNKNOWN),
         (302, b"", "https://example.com/twofactor/manage", SessionRevocationStatus.UNKNOWN),
         (302, b"", "https://[", SessionRevocationStatus.UNKNOWN),
         (200, b'{"success":1}', "", SessionRevocationStatus.CONFIRMED),
@@ -370,7 +419,7 @@ def test_rsa_key_uses_steam_username_instead_of_account_alias(tmp_path: Path) ->
 
     def post(url: str, data: dict[str, str]) -> Any:
         submitted.append(data)
-        return SimpleNamespace(status_code=200, json=lambda: {"publickey_mod": "ab", "publickey_exp": "01", "timestamp": "10"})
+        return SimpleNamespace(status_code=200, content=b'{"success":true,"publickey_mod":"ab","publickey_exp":"01","timestamp":"10"}')
 
     changer.steam_client._session.post = post
     changer.steam_client._get_session_id = lambda: "test-session"
@@ -414,12 +463,15 @@ def test_password_change_refuses_recovery_route_before_any_submission(tmp_path: 
     assert not adapter.requests
 
 
+@pytest.mark.parametrize("locale,redirected", [("en", True), ("ru", True), ("pt-br", False)])
 @pytest.mark.parametrize("link_mode,expected", [("native", True), ("lost-access", False), ("missing", False)])
-def test_password_initialization_requires_native_change_link(tmp_path: Path, link_mode: str, expected: bool) -> None:
+def test_password_initialization_requires_native_change_link(
+    tmp_path: Path, link_mode: str, expected: bool, locale: str, redirected: bool
+) -> None:
     """Read the exact route from the native link instead of inventing missing flags."""
     changer: PasswordChanger = _password_changer(tmp_path)
     fixture: Path = Path(__file__).parents[1] / "scripts/fixtures/steam_password_change.link.sanitized.html"
-    html: str = fixture.read_text(encoding="utf-8")
+    html: str = fixture.read_text(encoding="utf-8").replace("/en/wizard/", f"/{locale}/wizard/")
     if link_mode == "lost-access":
         html = html.replace("lost=0", "lost=2")
     elif link_mode == "missing":
@@ -427,12 +479,78 @@ def test_password_initialization_requires_native_change_link(tmp_path: Path, lin
     response: requests.Response = requests.Response()
     response.status_code = 200
     response._content = ("steam_login\n" + html).encode()
-    response.url = "https://help.steampowered.com/en/wizard/HelpWithLoginInfoSendCode/?s=REDACTED&account=REDACTED&reset=1&issueid=406"
-    response.history = [requests.Response()]
+    response.url = f"https://help.steampowered.com/{locale}/wizard/HelpChangePassword"
+    response.history = [requests.Response()] if redirected else []
     changer.steam_client._session.get = lambda *args, **kwargs: response
     assert changer._initialize_recovery(changer.steam_client.steam_id) is expected
     if expected:
         assert changer.recovery_params["lost"] == "0"
+
+
+def test_password_initialization_reports_steam_error_before_parsing_links(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A redirected HTTP 200 error page must report Steam's code instead of a missing continuation."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    fixture: Path = Path(__file__).parents[1] / "scripts/fixtures/steam_password_change.error84.sanitized.html"
+    response: requests.Response = requests.Response()
+    response.status_code = 200
+    response._content = ("steam_login\n" + fixture.read_text(encoding="utf-8")).encode()
+    response.url = "https://help.steampowered.com/ru/wizard/HelpChangePassword"
+    response.history = [requests.Response()]
+    changer.steam_client._session.get = lambda *args, **kwargs: response
+
+    assert changer._initialize_recovery(changer.steam_client.steam_id) is False
+    output: str = capsys.readouterr().out.lower()
+    assert "84" in output
+    assert "лимит" in output
+
+
+def test_password_initialization_ignores_inactive_error_template(tmp_path: Path) -> None:
+    """The real wizard includes an inactive generic error block alongside its native continuation."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    fixture: Path = Path(__file__).parents[1] / "scripts/fixtures/steam_password_change.continuation.sanitized.html"
+    response: requests.Response = requests.Response()
+    response.status_code = 200
+    response._content = ("steam_login\n" + fixture.read_text(encoding="utf-8")).encode()
+    response.url = "https://help.steampowered.com/ru/wizard/HelpWithLoginInfoSendCode/"
+    response.history = [requests.Response()]
+    changer.steam_client._session.get = lambda *args, **kwargs: response
+
+    assert changer._initialize_recovery(changer.steam_client.steam_id) is True
+    assert changer.recovery_params["lost"] == "0"
+
+
+@pytest.mark.parametrize("failure_stage", ["initialization", "availability", "installation"])
+def test_password_failure_message_distinguishes_unsent_password(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure_stage: str
+) -> None:
+    """Only a failure after the actual password POST may suggest the password already changed."""
+    changer: PasswordChanger = _password_changer(tmp_path)
+    submitted: bool = failure_stage == "installation"
+    monkeypatch.setattr(changer.account_context.cookie_manager, "get_steam_client", lambda: changer.steam_client)
+    monkeypatch.setattr(changer, "_verify_current_session", lambda: True)
+    monkeypatch.setattr(changer, "_verify_steam_guard_data", lambda: True)
+    monkeypatch.setattr(changer, "_get_new_password", lambda: "new-password")
+    monkeypatch.setattr(changer, "_confirm_password_change", lambda password: True)
+    if failure_stage != "initialization":
+        monkeypatch.setattr(changer, "_check_password_available", lambda password: submitted)
+        monkeypatch.setattr(changer, "_get_rsa_key", lambda: {"timestamp": "10"})
+        monkeypatch.setattr(changer, "_encrypt_password", lambda password, key: "ciphertext")
+
+        def fail_post(*args: object, **kwargs: object) -> None:
+            raise requests.Timeout("simulated timeout")
+
+        changer.steam_client._session.post = fail_post
+        monkeypatch.setattr(changer, "_change_password_full_process", changer._set_new_password)
+    else:
+        monkeypatch.setattr(changer, "_change_password_full_process", lambda password: False)
+
+    assert changer.execute() is False
+    output: str = capsys.readouterr().out
+    assert ("пароль уже мог измениться" in output.lower()) is submitted
+    if not submitted:
+        assert "не отправлялся" in output
+        assert "Запрос установки" in output
+    assert changer.account_context.config_manager.accounts_settings["selected_alias"]["password"] == "old-password"
 
 
 @pytest.mark.parametrize(

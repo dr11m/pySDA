@@ -31,3 +31,31 @@ mode fields of the public forgot-password entry GET
 on the same date. It is a derivative, not the complete raw response. The private
 diagnostic script `fetch_password_flow.py` recorded the original HTML outside Git.
 No code was sent and no password-change or verification POST was submitted.
+
+`steam_password_change.error84.sanitized.html` is an error-only derivative of an
+authenticated GET of `HelpChangePassword`, captured on 2026-10-20 at 17:46 UTC.
+The response redirected to `/ru/wizard/HelpChangePassword` and returned HTTP 200
+with `#error_description` and code 84 (temporary rate limit), without a wizard
+continuation. The derivative retains the `page_error` wrapper that activates the
+error display. The original response bytes remain outside Git. The reusable
+read-only collector is `scripts/fetch_password_flow.py`; it takes an account
+alias, its existing session file, and a private output directory. It replaces
+saved routing with the current configured account route, verifies the Steam
+Help cookie owner, performs no login or POST, and does not persist cookies.
+
+`steam_password_change.continuation.sanitized.html` is a wrapper-and-link
+derivative of a real authenticated wizard entry GET captured on 2026-10-20 at
+18:04 UTC. The normal `page_content` wrapper contains an inactive generic
+`error_description` template and a native Russian continuation link. Recovery
+and account IDs are replaced with `REDACTED`. Merely finding the generic error
+template does not indicate a failed page; an active error uses `page_error`.
+
+The `steam_Ajax*.success.sanitized.json` derivatives were collected during one
+authorized password change on 2026-10-20 at 18:06 UTC. They preserve the observed
+boolean and error fields; navigation `hash` and `redirect` values are replaced
+with `REDACTED`. Each file identifies its endpoint. Original response bytes are
+retained privately outside Git. `steam_getrsakey.success.sanitized.json` retains
+the public RSA key and timestamp; it contains no private key or password.
+`tests/test_password_response_fixtures.py` checks these observed formats against
+the Pydantic models and rejects ambiguous availability values. The fresh login,
+not a navigation response alone, establishes the password change result.

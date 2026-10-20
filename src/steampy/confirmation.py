@@ -59,8 +59,8 @@ class ConfirmationExecutor:
         params['ck'] = confirmation.nonce
         headers = {'X-Requested-With': 'XMLHttpRequest'}
         response = self._session.get(f'{self.CONF_URL}/ajaxop', params=params, headers=headers).json()
-        logger.info(f"🔑 Отправлен запрос на подтверждение, response:\n {response}")
-        
+        logger.debug("Mobile confirmation response received")
+
         return response
 
     def _get_confirmations(self) -> list[Confirmation]:
@@ -81,19 +81,13 @@ class ConfirmationExecutor:
                     creator_id = int(conf["creator_id"])
                     confirmations.append(Confirmation(data_confid, nonce, creator_id))
                 return confirmations
-            logger.warning(
-                f"⚠️ mobileconf/getlist вернул статус {last_status}: {last_body} "
-                f"(попытка {attempt}/{retry_count})"
-            )
+            logger.warning(f"Mobile confirmation list request failed: status={last_status} attempt={attempt}/{retry_count}")
             if attempt < retry_count:
                 delay = retry_delay * attempt
                 logger.info(f"⏳ Повтор запроса подтверждений через {delay} сек")
                 time.sleep(delay)
-        raise ConfirmationExpected(
-            f"Confirmation list unavailable after {retry_count} attempts, "
-            f"last status {last_status}: {last_body}"
-        )
-        
+        raise ConfirmationExpected(f"Confirmation list unavailable after {retry_count} attempts, last status {last_status}")
+
     def get_confirmation(self, key: str | int, *, update_listings=True) -> Confirmation:
         """
         Fetch all confirmations from `Steam`, filter and get one.
@@ -130,12 +124,7 @@ class ConfirmationExecutor:
         response = self._session.get(f'{self.CONF_URL}/getlist', params=params, headers=headers)
         if 'Steam Guard Mobile Authenticator is providing incorrect Steam Guard codes.' in response.text:
             raise InvalidCredentials('Invalid Steam Guard file')
-        # Сохраняем ответ в текстовый файл для отладки
-        try:
-            with open("debug_confirmations_page.txt", "w", encoding="utf-8") as f:
-                f.write(response.text)
-        except Exception:
-            pass  # Не мешаем основной логике, если не удалось сохранить
+        logger.debug(f"Mobile confirmation list response received: status={response.status_code} bytes={len(response.content)}")
         return response
 
     def _fetch_confirmation_details_page(self, confirmation: Confirmation) -> str:

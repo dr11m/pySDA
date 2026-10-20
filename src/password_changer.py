@@ -17,8 +17,7 @@ import base64
 import time
 import urllib.parse
 import re
-from getpass import getpass
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
 from typing import Optional, Dict, Any, Union, List
 from .cli.constants import Messages
@@ -27,8 +26,15 @@ from .utils.logger_setup import print_and_log
 from .utils.cookies_and_session import session_to_dict, extract_cookies_for_domain
 from .cli.account_context import AccountContext
 from .steampy.client import SteamClient
-from .steampy.security import SteamPasswordChangeResponse, SteamRecoveryResponse, account_session_id
+from .steampy.security import (
+    SteamPasswordAvailabilityResponse,
+    SteamPasswordChangeResponse,
+    SteamRecoveryResponse,
+    SteamRsaKeyResponse,
+    account_session_id,
+)
 from .steampy.confirmation import ConfirmationExecutor, Confirmation
+from .steampy.models import EResult
 
 from .utils.logger_setup import logger
 
@@ -138,6 +144,7 @@ class PasswordChanger:
 
         # Параметры для восстановления (эквивалент PasswordChangeParams)
         self.recovery_params: Dict[str, str] = {}
+        self._password_submission_attempted: bool = False
 
     def _help_session_id(self, url: str) -> str:
         """Require authentication and the CSRF cookie for the actual Steam Help destination."""
@@ -187,6 +194,7 @@ class PasswordChanger:
         Returns:
             bool: True если пароль успешно изменен, False в противном случае
         """
+        self._password_submission_attempted = False
         try:
             print_and_log(f"🔒 Начинаем смену пароля для аккаунта: {self.username}")
             print_and_log("")
@@ -213,7 +221,7 @@ class PasswordChanger:
                 return False
             
             # Подтверждение смены
-            if not self._confirm_password_change():
+            if not self._confirm_password_change(new_password):
                 return False
             
             # Полный процесс смены пароля
@@ -229,9 +237,12 @@ class PasswordChanger:
                     )
                     return False
             else:
-                print_and_log(
-                    "❌ Смена пароля не подтверждена. После сетевой ошибки пароль уже мог измениться; не повторяйте запрос вслепую."
-                )
+                if self._password_submission_attempted:
+                    print_and_log(
+                        "❌ Смена пароля не подтверждена. После сетевой ошибки пароль уже мог измениться; не повторяйте запрос вслепую."
+                    )
+                else:
+                    print_and_log("❌ Смена пароля остановлена. Запрос установки нового пароля не отправлялся.")
                 return False
 
         except Exception as e:
@@ -371,40 +382,49 @@ class PasswordChanger:
     def _initialize_recovery(self, steam_id: str) -> bool:
         """
         Инициализация процесса восстановления пароля.
-        
+
         Аналог _receive_password_change_params из оригинального кода.
-        
+
         Args:
             steam_id: Steam ID аккаунта
-            
+
         Returns:
             bool: True если инициализация прошла успешно
         """
         try:
             print_and_log(f"🔍 Начинаем инициализацию для Steam ID: {steam_id}")
-    
+
             print_and_log("🔍 Отправляем запрос с куки от steamcommunity.com...")
 
             headers = {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'Referer': 'https://store.steampowered.com/',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'same-site',
-                'Sec-Fetch-User': '?1',
-                'Upgrade-Insecure-Requests': '1',
-                **self.http_helper.get_common_headers()
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Referer": "https://store.steampowered.com/",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-site",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                **self.http_helper.get_common_headers(),
             }
-            
-            response = self.steam_client._session.get(
-                SteamUrls.HELP_CHANGE_PASSWORD,
-                headers=headers,
-                allow_redirects=True
-            )
-            
+
+            response = self.steam_client._session.get(SteamUrls.HELP_CHANGE_PASSWORD, headers=headers, allow_redirects=True)
+
             print_and_log(f"🔍 Статус ответа: {response.status_code}")
             print_and_log("🔍 Ответ Steam Help получен.")
             print_and_log(f"🔍 История редиректов: {len(response.history)} редиректов")
+
+            page: BeautifulSoup = BeautifulSoup(response.text, "html.parser")
+            error_description: Tag | None = page.select_one(".page_error #error_description")
+            if error_description is not None:
+                error_code: re.Match[str] | None = re.search(r"\((\d+)\)\s*$", error_description.get_text(" ", strip=True))
+                if error_code is not None and int(error_code.group(1)) == EResult.RATE_LIMIT_EXCEEDED.value:
+                    print_and_log("❌ Steam Help: превышен лимит запросов (84). Повторите попытку позже.")
+                else:
+                    print_and_log("❌ Steam Help вернул ошибку. Смена пароля остановлена.")
+                return False
+            if response.status_code != 200:
+                print_and_log(f"❌ Steam Help: HTTP {response.status_code}")
+                return False
 
             if self.account_context.username.lower() in response.text.lower():
                 print(f"✅ {self.username} найден в тексте - АВТОРИЗОВАН")
@@ -421,64 +441,37 @@ class PasswordChanger:
                 print_and_log("  • Требуется повторный вход в аккаунт")
                 return False
 
-            # Проверяем редиректы (как в оригинальном коде)
-            if response.history:
-                print_and_log("✅ Обнаружен редирект, извлекаем параметры из URL...")
-
-                try:
-                    page: BeautifulSoup = BeautifulSoup(response.text, "html.parser")
-                    continuation_urls: list[str] = [
-                        urllib.parse.urljoin(response.url, anchor["href"])
-                        for anchor in page.find_all("a", href=True)
-                        if urllib.parse.urlparse(urllib.parse.urljoin(response.url, anchor["href"])).path
-                        == urllib.parse.urlparse(SteamUrls.ENTER_CODE).path
-                    ]
-                    if len(continuation_urls) != 1:
-                        print_and_log("❌ Steam не выдал однозначную ссылку продолжения смены пароля.")
-                        return False
-                    continuation: urllib.parse.ParseResult = urllib.parse.urlparse(continuation_urls[0])
-                    if continuation.scheme != "https" or continuation.netloc != "help.steampowered.com":
-                        return False
-                    query_params: dict[str, list[str]] = urllib.parse.parse_qs(continuation.query)
-                    required_fields: tuple[str, ...] = ("s", "account", "reset", "issueid", "lost")
-                    if any(len(query_params.get(key, [])) != 1 for key in required_fields):
-                        print_and_log("❌ Steam не выдал обязательные параметры смены пароля.")
-                        return False
-                    self.recovery_params = {key: query_params[key][0] for key in required_fields}
-                    if not self._has_password_change_route():
-                        print_and_log("❌ Steam выдал сценарий восстановления или неизвестный режим. Продолжение остановлено.")
-                        return False
-                    print_and_log("✅ Получен штатный сценарий смены пароля: lost=0.")
-                    return True
-
-                except Exception as e:
-                    print_and_log(f"❌ Ошибка извлечения параметров из редиректа: {type(e).__name__}")
-                    return False
-
-            # Если редиректа не было, проверяем HTML на ошибки (как в оригинальном коде)
-            html_content = response.text
-            print_and_log("🔍 Редиректа не было, анализируем HTML...")
-
-            # Ищем ошибки в HTML (аналог page.cssselect('#error_description'))
-            error_patterns = [
-                r'<div[^>]*id=["\']error_description["\'][^>]*>([^<]+)</div>',
-                r'<div[^>]*class="[^"]*error[^"]*"[^>]*>([^<]+)</div>',
+            # Parse the native continuation independently of language redirects.
+            continuation_urls: list[str] = [
+                urllib.parse.urljoin(response.url, anchor["href"])
+                for anchor in page.find_all("a", href=True)
+                if re.fullmatch(
+                    r"/(?:[a-z]{2}(?:-[a-z0-9]{2,3})?/)?wizard/HelpWithLoginInfoEnterCode/?",
+                    urllib.parse.urlparse(urllib.parse.urljoin(response.url, anchor["href"])).path,
+                )
             ]
-
-            for pattern in error_patterns:
-                error_match = re.search(pattern, html_content, re.IGNORECASE)
-                if error_match:
-                    print_and_log("❌ Steam вернул ошибку восстановления.")
-                    return False
-
-            print_and_log("❌ Не удалось получить параметры смены пароля")
-            print_and_log(f"🔍 Длина страницы Steam Help: {len(html_content)}")
-            return False
+            if len(continuation_urls) != 1:
+                print_and_log("❌ Steam не выдал однозначную ссылку продолжения смены пароля.")
+                return False
+            continuation: urllib.parse.ParseResult = urllib.parse.urlparse(continuation_urls[0])
+            if continuation.scheme != "https" or continuation.netloc != "help.steampowered.com":
+                return False
+            query_params: dict[str, list[str]] = urllib.parse.parse_qs(continuation.query)
+            required_fields: tuple[str, ...] = ("s", "account", "reset", "issueid", "lost")
+            if any(len(query_params.get(key, [])) != 1 for key in required_fields):
+                print_and_log("❌ Steam не выдал обязательные параметры смены пароля.")
+                return False
+            self.recovery_params = {key: query_params[key][0] for key in required_fields}
+            if not self._has_password_change_route():
+                print_and_log("❌ Steam выдал сценарий восстановления или неизвестный режим. Продолжение остановлено.")
+                return False
+            print_and_log("✅ Получен штатный сценарий смены пароля: lost=0.")
+            return True
 
         except Exception as e:
             print_and_log(f"❌ Исключение в _initialize_recovery: {type(e).__name__}", "ERROR")
             return False
-    
+
     def _goto_enter_code(self) -> bool:
         """
         Переход к странице ввода кода с использованием извлеченных параметров.
@@ -793,6 +786,7 @@ class PasswordChanger:
                 'rsatimestamp': rsa_key['timestamp']  # Временная метка RSA ключа
             }
 
+            self._password_submission_attempted = True
             response = self.steam_client._session.post(url, data=data, allow_redirects=False)
             if response.status_code != 200:
                 print_and_log(f"❌ Steam не подтвердил смену пароля: HTTP {response.status_code}")
@@ -833,12 +827,12 @@ class PasswordChanger:
             
             response = self.steam_client._session.post(url, data=data)
             if response.status_code == 200:
-                result = response.json()
-                if not result.get('errorMsg'):
+                result: SteamRsaKeyResponse = SteamRsaKeyResponse.model_validate_json(response.content)
+                if result.confirmed:
                     return {
-                        'mod': result.get('publickey_mod', ''),
-                        'exp': result.get('publickey_exp', ''),
-                        'timestamp': result.get('timestamp', '')
+                        'mod': result.publickey_mod,
+                        'exp': result.publickey_exp,
+                        'timestamp': result.timestamp,
                     }
             
             return None
@@ -900,9 +894,9 @@ class PasswordChanger:
             
             response = self.steam_client._session.post(url, data=data)
             if response.status_code == 200:
-                result = response.json()
+                result: SteamPasswordAvailabilityResponse = SteamPasswordAvailabilityResponse.model_validate_json(response.content)
                 logger.info("Password availability response received")
-                if result.get('available'):
+                if result.available:
                     print_and_log("✅ Пароль доступен")
                     return True
                 else:
@@ -942,7 +936,7 @@ class PasswordChanger:
     def _get_new_password(self) -> Optional[str]:
         """
         Интерактивное получение нового пароля от пользователя.
-        
+
         Returns:
             Optional[str]: Новый пароль или None при отмене
         """
@@ -953,9 +947,9 @@ class PasswordChanger:
         print_and_log("  • Должен содержать буквы и цифры")
         print_and_log("  • Рекомендуется использовать специальные символы")
         print_and_log("")
-        
+
         while True:
-            new_password: str = getpass("Новый пароль: ")
+            new_password: str = input("Новый пароль: ")
 
             if not new_password:
                 print_and_log("❌ Пароль не может быть пустым", "ERROR")
@@ -966,57 +960,62 @@ class PasswordChanger:
 
             # Проверяем надежность пароля
             validation: Dict[str, Union[bool, int, List[str]]] = self.validate_password_strength(new_password)
-            if not validation['is_valid']:
+            if not validation["is_valid"]:
                 print_and_log("❌ Пароль не соответствует требованиям:")
-                for issue in validation['issues']:
+                for issue in validation["issues"]:
                     print_and_log(f"  • {issue}")
                 continue
-            
+
             # Подтверждение пароля
-            confirm_password: str = getpass("Подтвердите новый пароль: ")
+            confirm_password: str = input("Подтвердите новый пароль: ")
             if new_password != confirm_password:
                 print_and_log("❌ Пароли не совпадают", "ERROR")
                 continue
-            
+
             # Показываем оценку надежности
-            score: int = validation['score']
+            score: int = validation["score"]
             if score >= 4:
                 print_and_log("✅ Отличный пароль!")
             elif score >= 2:
                 print_and_log("⚠️  Пароль средней надежности")
             else:
                 print_and_log("⚠️  Слабый пароль, но соответствует минимальным требованиям")
-            
+
             return new_password
-    
-    def _confirm_password_change(self) -> bool:
-        """
-        Интерактивное подтверждение смены пароля.
-        
+
+    def _confirm_password_change(self, new_password: str) -> bool:
+        """Preview the password in the console and require consent before submission.
+
+        Args:
+            new_password: Exact password to display without writing it to logs.
+
         Returns:
-            bool: True если пользователь подтвердил смену пароля
+            True if the user confirms the displayed password.
         """
         print_and_log("")
         print_and_log("⚠️  ВНИМАНИЕ:")
         print_and_log("  • Смена пароля может затронуть работу бота")
         print_and_log("  • Убедитесь, что у вас есть доступ к мобильному приложению Steam Guard")
         print_and_log("  • После смены пароля может потребоваться повторная настройка")
-        print_and_log("  • Отсутствие ограничений торговли после этой CLI-команды ещё не проверено на реальном аккаунте.")
+        print_and_log("  • Один тестовый аккаунт проверен без новых видимых ограничений; это не гарантия для всех аккаунтов.")
         print_and_log(
             "  • При сбросе забытого пароля Steam ограничивает торговлю и Market на 5 дней, а после долгой неактивности — на 30 дней."
         )
         print_and_log("")
+        print_and_log(f"Аккаунт: {self.username}")
+        print(f"Новый пароль: {new_password}")
+        print_and_log("Убедитесь, что новый пароль указан верно.")
 
         while True:
-            choice: str = input("Продолжить смену пароля? (y/N): ").lower().strip()
+            choice: str = input("Установить этот пароль? (y/N): ").lower().strip()
             if choice in ("y", "yes", "да", "д"):
                 return True
-            elif choice in ('n', 'no', 'нет', 'н', ''):
+            elif choice in ("n", "no", "нет", "н", ""):
                 print_and_log("Отменено.")
                 return False
             else:
                 print_and_log("❌ Введите 'y' для продолжения или 'n' для отмены", "ERROR")
-    
+
     def _verify_current_session(self) -> bool:
         """
         Проверка активности текущей сессии Steam.

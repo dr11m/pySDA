@@ -101,11 +101,8 @@ class CookieManager:
             return False
         
         try:
-            # Используем статический метод проверки сессии
-            is_alive = self.steam_client.check_session_static(
-                self.username, 
-                self.steam_client._session
-            )
+            # Check account ownership before probing the saved session.
+            is_alive: bool = self.steam_client.check_account_session()
             
             if is_alive:
                 logger.info("✅ Сессия активна")
@@ -230,9 +227,7 @@ class CookieManager:
                 print_and_log(
                     f"🔄 Проверяем активность сессии через market/mylistings для {self.username}"
                 )
-                is_session_alive = self.steam_client.check_session_static(
-                    self.username, self.steam_client._session
-                )
+                is_session_alive: bool = self.steam_client.check_account_session()
                 print_and_log(f"🔄 is_session_alive: {is_session_alive}")
                 if is_session_alive is True:
                     logger.info(
@@ -246,9 +241,7 @@ class CookieManager:
 
             print_and_log(f"🔄 Refreshing Steam session for {self.username}")
             self.steam_client.update_session()
-            if not self.steam_client.check_session_static(
-                self.username, self.steam_client._session
-            ):
+            if not self.steam_client.check_account_session():
                 logger.error(
                     f"Session still invalid after refresh for {self.username}"
                 )
@@ -313,9 +306,12 @@ class CookieManager:
         logger.info("🔍 get_steam_client() вызван")
         
         # Если клиент уже есть и сессия активна - возвращаем его
-        if self.steam_client and hasattr(self.steam_client, 'was_login_executed') and self.steam_client.was_login_executed:
+        if self.steam_client and self.steam_client.was_login_executed and self.steam_client.is_session_owned():
             logger.info("✅ Возвращаем существующий активный клиент")
             return self.steam_client
+
+        if self.steam_client is not None:
+            self.steam_client.was_login_executed = False
         
         # Проверяем актуальность cookies
         cookies = self.get_cookies()
