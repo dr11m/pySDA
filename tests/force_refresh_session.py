@@ -16,7 +16,7 @@ def example_refresh_session():
     """Пример обновления сессии"""
     
     # Пример 1: Создание клиента с существующей сессией
-    username = "JkzbuMjpDL"  # Замените на реальное имя пользователя
+    username = "example_account"  # Замените на реальное имя пользователя
     session_path = f"accounts_info/{username}.pkl"
     
     print("📋 Пример 1: Создание клиента с существующей сессией")
