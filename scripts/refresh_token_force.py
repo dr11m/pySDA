@@ -12,7 +12,7 @@ def test_refresh_token_force():
     """Тест принудительного использования refresh token"""
     print("🧪 Тестируем принудительное использование refresh token...")
     
-    account_name = "JkzbuMjpDL"
+    account_name = "example_account"
     pkl_path = f"accounts_info/{account_name}.pkl"
     
     # Проверяем, есть ли pkl файл с refresh token

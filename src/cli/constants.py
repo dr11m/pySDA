@@ -28,6 +28,7 @@ class SettingsMenuChoice(Enum):
     GET_API_KEY = "1"
     GET_GUARD_CONFIRMATIONS = "2"
     CHANGE_PASSWORD = "3"
+    LOGOUT_ALL_SESSIONS = "4"
     BACK = "0"
 
 
@@ -74,7 +75,8 @@ class Messages:
     GET_API_KEY = "🔑 Получить/обновить API ключ"
     GET_GUARD_CONFIRMATIONS = "🔐 Получить список подтверждений Guard"
     CHANGE_PASSWORD = "🔒 Смена пароля"
-    
+    LOGOUT_ALL_SESSIONS = "🚪 Выйти из всех сессий выбранного аккаунта"
+
     # Меню автоматизации
     AUTO_SETTINGS = "⚙️  Настройки автоматизации"
     START_AUTO_ACCEPT = "▶️  Включить авто принятие"

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 from src.utils.logger_setup import logger, print_and_log, log_exception
 from src.steampy.client import SteamClient
+from src.steampy.security import SessionRevocationResult, SessionRevocationStatus
 from src.interfaces.storage_interface import CookieStorageInterface as StorageInterface
 from src.utils.cookies_and_session import session_to_dict
 from src.cli.config_manager import global_config
@@ -100,11 +101,8 @@ class CookieManager:
             return False
         
         try:
-            # Используем статический метод проверки сессии
-            is_alive = self.steam_client.check_session_static(
-                self.username, 
-                self.steam_client._session
-            )
+            # Check account ownership before probing the saved session.
+            is_alive: bool = self.steam_client.check_account_session()
             
             if is_alive:
                 logger.info("✅ Сессия активна")
@@ -229,9 +227,7 @@ class CookieManager:
                 print_and_log(
                     f"🔄 Проверяем активность сессии через market/mylistings для {self.username}"
                 )
-                is_session_alive = self.steam_client.check_session_static(
-                    self.username, self.steam_client._session
-                )
+                is_session_alive: bool = self.steam_client.check_account_session()
                 print_and_log(f"🔄 is_session_alive: {is_session_alive}")
                 if is_session_alive is True:
                     logger.info(
@@ -245,9 +241,7 @@ class CookieManager:
 
             print_and_log(f"🔄 Refreshing Steam session for {self.username}")
             self.steam_client.update_session()
-            if not self.steam_client.check_session_static(
-                self.username, self.steam_client._session
-            ):
+            if not self.steam_client.check_account_session():
                 logger.error(
                     f"Session still invalid after refresh for {self.username}"
                 )
@@ -312,9 +306,12 @@ class CookieManager:
         logger.info("🔍 get_steam_client() вызван")
         
         # Если клиент уже есть и сессия активна - возвращаем его
-        if self.steam_client and hasattr(self.steam_client, 'was_login_executed') and self.steam_client.was_login_executed:
+        if self.steam_client and self.steam_client.was_login_executed and self.steam_client.is_session_owned():
             logger.info("✅ Возвращаем существующий активный клиент")
             return self.steam_client
+
+        if self.steam_client is not None:
+            self.steam_client.was_login_executed = False
         
         # Проверяем актуальность cookies
         cookies = self.get_cookies()
@@ -363,7 +360,60 @@ class CookieManager:
             logger.info(f"📋 Cookies в возвращаемом клиенте: {client_cookies}")
         
         return self.steam_client
-    
+
+    def set_password(self, password: str) -> None:
+        """Update the password used by this account's resident clients."""
+        self.password = password
+        self.client.set_password(password)
+        if self.steam_client is not None:
+            self.steam_client.set_password(password)
+
+    def save_verified_session(self, password: str) -> bool:
+        """Keep the verified login in memory and persist it without repeating a password change."""
+        self.set_password(password)
+        if self.client is not self.steam_client:
+            self.client._session.cookies.clear()
+            self.client._session.close()
+            self.client.refresh_token = None
+            self.client.was_login_executed = False
+            self.client = self.steam_client
+        self.cookies_cache = session_to_dict(self.steam_client._session)
+        self.last_update = datetime.now(timezone.utc)
+        try:
+            return self.steam_client.save_session(str(self.accounts_dir), self.username)
+        except Exception as error:
+            logger.error(f"Failed to persist the verified session for '{self.username}': {type(error).__name__}")
+            return False
+
+    def revoke_all_sessions(self) -> SessionRevocationResult:
+        """Revoke the selected account and discard its caches even when the remote result is uncertain."""
+        client: SteamClient | None = self.get_steam_client()
+        if client is None:
+            return SessionRevocationResult(SessionRevocationStatus.REJECTED, False)
+        status: SessionRevocationStatus = client.revoke_all_sessions()
+        if status is SessionRevocationStatus.REJECTED:
+            return SessionRevocationResult(status, False)
+        cleanup_complete: bool = True
+        try:
+            cleanup_complete = self.storage.delete_cookies(self.username)
+        except Exception:
+            cleanup_complete = False
+            logger.error(f"Failed to delete stored cookies for '{self.username}' after session revocation")
+        try:
+            self.session_file.unlink(missing_ok=True)
+        except OSError:
+            cleanup_complete = False
+            logger.error(f"Failed to delete the saved session for '{self.username}' after session revocation")
+        self.clear_cache()
+        for resident_client in (self.client, self.steam_client):
+            if resident_client is not None:
+                resident_client.refresh_token = None
+                resident_client.was_login_executed = False
+                resident_client._session.cookies.clear()
+                resident_client._session.close()
+        self.steam_client = None
+        return SessionRevocationResult(status, cleanup_complete)
+
     def clear_cache(self):
         """Очистка кэша cookies"""
         self.cookies_cache = None

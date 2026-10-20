@@ -1,9 +1,9 @@
 """Proxy parsing helpers for Playwright."""
 
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 
-from browser_launcher.proxy_format import extract_proxy_endpoint, format_proxy_label
+from browser_launcher.proxy_format import format_proxy_label
 from src.factories import create_instance_from_config
 
 CS_DEALS_PROXY_BYPASS = "cs.deals,.cs.deals"
@@ -13,10 +13,21 @@ def resolve_account_proxy(
     proxy_provider_config: Dict[str, Any],
     account_name: str,
 ) -> Optional[Dict[str, str]]:
-    """Resolve requests-style proxy mapping for an account."""
-    if not proxy_provider_config:
-        return None
-    provider = create_instance_from_config(proxy_provider_config)
+    """Resolve an account route from an explicitly configured proxy provider.
+
+    Args:
+        proxy_provider_config: Provider module and class configuration.
+        account_name: Account whose route is required.
+
+    Returns:
+        Account proxy mapping, or None for the provider's explicit no_proxy marker.
+
+    Raises:
+        ValueError: Required provider configuration is missing.
+    """
+    if not proxy_provider_config or not proxy_provider_config.get("module_path") or not proxy_provider_config.get("class_name"):
+        raise ValueError("Account proxy provider must specify module_path and class_name")
+    provider: Any = create_instance_from_config(proxy_provider_config)
     return provider.get_proxy(account_name)
 
 
@@ -32,25 +43,34 @@ def to_playwright_proxy(
     proxy_mapping: Optional[Dict[str, str]],
     bypass_cs_deals: bool = False,
 ) -> Optional[Dict[str, str]]:
-    """Convert requests-style proxy dict to Playwright proxy settings."""
-    if not proxy_mapping:
-        return None
+    """Convert an explicit route without falling back to direct on invalid proxies.
 
-    proxy_url = proxy_mapping.get("https") or proxy_mapping.get("http")
-    if not proxy_url:
-        return None
+    Args:
+        proxy_mapping: Both account proxy routes, or None for explicit direct access.
+        bypass_cs_deals: Whether cs.deals should use direct access.
 
-    endpoint = extract_proxy_endpoint(proxy_mapping)
-    if endpoint is None:
-        return None
+    Returns:
+        Playwright proxy settings, or None only for explicit direct access.
 
-    parsed = urlparse(proxy_url)
-    if not parsed.hostname or not parsed.port:
+    Raises:
+        ValueError: The configured mapping or proxy URL is incomplete or invalid.
+    """
+    if proxy_mapping is None:
         return None
+    if not proxy_mapping.get("http") or not proxy_mapping.get("https"):
+        raise ValueError("Account proxy must specify both http and https routes")
 
-    scheme = parsed.scheme or "http"
+    proxy_url: str = proxy_mapping["https"]
+    try:
+        parsed: ParseResult = urlparse(proxy_url)
+        port: int | None = parsed.port
+    except ValueError:
+        raise ValueError("Account proxy URL is invalid") from None
+    if parsed.scheme not in {"http", "https", "socks4", "socks5"} or not parsed.hostname or not port:
+        raise ValueError("Account proxy URL must specify a supported scheme, host and port")
+
     playwright_proxy: Dict[str, str] = {
-        "server": f"{scheme}://{parsed.hostname}:{parsed.port}",
+        "server": f"{parsed.scheme}://{parsed.hostname}:{port}",
     }
 
     if parsed.username:

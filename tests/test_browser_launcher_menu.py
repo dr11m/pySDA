@@ -10,10 +10,10 @@ from browser_launcher.profile_store import ProfileStore
 def _write_account_config(config_path: Path, description: str | None) -> None:
     lines = [
         "accounts:",
-        "  atr1n4ik:",
-        '    username: "atr1n4ik"',
+        "  example_account:",
+        '    username: "example_account"',
         '    password: "secret"',
-        '    mafile_path: "accounts_info/atr1n4ik.maFile"',
+        '    mafile_path: "accounts_info/example_account.maFile"',
         '    steam_id: "76561198000000000"',
     ]
     if description is not None:
@@ -29,7 +29,7 @@ def test_get_account_settings_includes_description(tmp_path: Path) -> None:
     reader = BrowserConfigReader(config_path)
     assert reader.load() is True
 
-    settings = reader.get_account_settings("atr1n4ik")
+    settings = reader.get_account_settings("example_account")
     assert settings is not None
     assert settings.description == "my main"
 
@@ -42,7 +42,7 @@ def test_get_account_settings_missing_description_is_empty(tmp_path: Path) -> No
     reader = BrowserConfigReader(config_path)
     assert reader.load() is True
 
-    settings = reader.get_account_settings("atr1n4ik")
+    settings = reader.get_account_settings("example_account")
     assert settings is not None
     assert settings.description == ""
 
@@ -50,8 +50,8 @@ def test_get_account_settings_missing_description_is_empty(tmp_path: Path) -> No
 def _menu_item(description: str) -> AccountMenuItem:
     return AccountMenuItem(
         index=1,
-        account_name="atr1n4ik",
-        username="atr1n4ik",
+        account_name="example_account",
+        username="example_account",
         proxy_label="direct",
         is_open=False,
         description=description,
@@ -63,8 +63,8 @@ def test_render_menu_includes_account_description(capsys) -> None:
     render_menu([_menu_item("my main")])
 
     output = capsys.readouterr().out
-    assert "atr1n4ik - my main" in output
-    assert "(user: atr1n4ik, proxy ip: direct)" in output
+    assert "example_account - my main" in output
+    assert "(user: example_account, proxy ip: direct)" in output
 
 
 def test_render_menu_omits_description_when_empty(capsys) -> None:
@@ -72,8 +72,8 @@ def test_render_menu_omits_description_when_empty(capsys) -> None:
     render_menu([_menu_item("")])
 
     output = capsys.readouterr().out
-    assert "atr1n4ik -" not in output
-    assert "atr1n4ik  (user: atr1n4ik, proxy ip: direct)" in output
+    assert "example_account -" not in output
+    assert "example_account  (user: example_account, proxy ip: direct)" in output
 
 
 def test_build_menu_items_copies_description(tmp_path: Path) -> None:

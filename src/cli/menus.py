@@ -18,6 +18,8 @@ from .settings_manager import SettingsManager
 from .auto_manager import AutoManager, AutoSettings
 from .market_handler import MarketHandler
 from ..password_changer import PasswordChanger
+from .account_context import AccountContext
+from ..steampy.security import SessionRevocationResult, SessionRevocationStatus
 from ..utils.logger_setup import print_and_log
 from pathlib import Path
 import json
@@ -344,8 +346,11 @@ class AccountActionsMenu(NavigableMenu):
     
     def open_settings_menu(self):
         """Открыть меню настроек"""
+        had_account: bool = self.cli.active_account_context is not None
         settings_menu = SettingsMenu(self.cli)
         settings_menu.run()
+        if had_account and self.cli.active_account_context is None:
+            self.go_back()
 
 
 class SettingsMenu(NavigableMenu):
@@ -379,7 +384,15 @@ class SettingsMenu(NavigableMenu):
             Messages.CHANGE_PASSWORD,
             self.change_password
         ))
-        
+
+        self.add_item(
+            MenuItem(
+                SettingsMenuChoice.LOGOUT_ALL_SESSIONS.value,
+                Messages.LOGOUT_ALL_SESSIONS,
+                self.logout_all_sessions,
+            )
+        )
+
         self.add_item(MenuItem(
             SettingsMenuChoice.BACK.value,
             Messages.BACK,
@@ -468,7 +481,35 @@ class SettingsMenu(NavigableMenu):
         # Создаем экземпляр PasswordChanger для текущего аккаунта
         self.password_changer = PasswordChanger(self.cli.active_account_context)
         return self.password_changer.change_password(self.cli.active_account_context)
-    
+
+    def logout_all_sessions(self) -> bool:
+        """Ask once and revoke sessions only for the currently selected account."""
+        context: AccountContext | None = self.cli.active_account_context
+        if context is None:
+            print_and_log("❌ Сначала выберите аккаунт.")
+            return False
+        print_and_log(f"Аккаунт: {context.account_name} (Steam: {context.username})")
+        print_and_log("Выход затронет все устройства и ботов этого аккаунта. maFile не меняется.")
+        if input("Выйти из всех сессий этого аккаунта? (y/N): ").strip().lower() not in {"y", "yes", "да", "д"}:
+            print_and_log("Отменено.")
+            return False
+        result: SessionRevocationResult = context.cookie_manager.revoke_all_sessions()
+        if result.status is SessionRevocationStatus.REJECTED:
+            print_and_log("❌ Steam не подтвердил выход: запрос отклонён или нет подходящей авторизации.")
+            return False
+        self.cli.active_account_context = None
+        self.cli.selected_account_name = None
+        self.go_back()
+        if result.status is SessionRevocationStatus.CONFIRMED:
+            print_and_log("✅ Steam подтвердил выход со всех устройств этого аккаунта.")
+        else:
+            print_and_log("⚠️ Результат запроса неизвестен. Проверьте устройства в Steam; не повторяйте запрос вслепую.")
+        if result.local_cleanup_complete:
+            print_and_log("Сохранённые cookies и .pkl-сессия этого аккаунта удалены. Повторный вход автоматически не выполняется.")
+        else:
+            print_and_log("⚠️ Локальная очистка выполнена не полностью. Проверьте хранилище cookies и файл сессии аккаунта.")
+        return result.status is SessionRevocationStatus.CONFIRMED and result.local_cleanup_complete
+
     def exit_app(self):
         """Выйти из приложения"""
         print_and_log(Messages.GOODBYE)
@@ -1031,6 +1072,3 @@ class AutoMenu(NavigableMenu):
         except (ValueError, IndexError):
             print_and_log("❌ Некорректный ввод.", "ERROR")
             input("Нажмите Enter для продолжения...")
-
-
- 

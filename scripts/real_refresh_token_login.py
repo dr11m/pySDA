@@ -15,7 +15,7 @@ def test_real_refresh_token_login():
     print("🔑 Реальный тест входа через refresh token и обновления cookies в БД...")
     
     # Выбираем аккаунт для тестирования
-    account_name = "JkzbuMjpDL"  # Можно изменить на другой аккаунт
+    account_name = "example_account"  # Можно изменить на другой аккаунт
     pkl_path = f"accounts_info/{account_name}.pkl"
     
     print(f"🎯 Тестируем аккаунт: {account_name}")
@@ -146,7 +146,7 @@ def test_cookies_validation_after_refresh():
     """Тест валидации cookies после обновления через refresh token"""
     print("\n✅ Тестируем валидацию cookies после обновления...")
     
-    account_name = "JkzbuMjpDL"
+    account_name = "example_account"
     storage = SqlAlchemyCookieStorage()
     
     # Загружаем cookies из БД
@@ -185,7 +185,7 @@ def test_session_alive_after_refresh():
     """Тест активности сессии после обновления через refresh token"""
     print("\n🔄 Тестируем активность сессии после обновления...")
     
-    account_name = "JkzbuMjpDL"
+    account_name = "example_account"
     pkl_path = f"accounts_info/{account_name}.pkl"
     
     if not os.path.exists(pkl_path):
