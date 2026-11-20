@@ -12,7 +12,7 @@ import requests
 from rsa import PublicKey, encrypt
 
 from . import guard
-from .exceptions import ApiException, CaptchaRequired, InvalidCredentials
+from .exceptions import ApiException, CaptchaRequired, InvalidCredentials, TooManyRequests
 from .models import SteamUrl, TransferResult
 
 from src.utils.logger_setup import logger
@@ -45,8 +45,7 @@ class LoginExecutor:
         try:
             login_response = self._send_login_request()
             logger.debug(f"BeginAuthSessionViaCredentials response for {self.username}: status={login_response.status_code}")
-            if not login_response.json()['response']:
-                raise ApiException('No response received from Steam API. Please try again later.')
+            self._begin_auth_params(login_response)
 
             self._check_for_captcha(login_response)
             
@@ -115,11 +114,48 @@ class LoginExecutor:
         if not login_response.json()['success']:
             raise InvalidCredentials(login_response.json()['message'])
 
+    def _begin_auth_params(self, login_response: Response) -> dict[str, Any]:
+        """Return BeginAuthSessionViaCredentials ids or raise a descriptive error.
+
+        Steam answers HTTP 200 even when no auth session is created: a
+        rate-limited call returns only ``interval``/``extended_error_message``.
+        Indexing ``client_id`` directly turns that into a bare ``KeyError``.
+        Only key names and Steam's human-readable message are logged here;
+        ids and tokens must never reach the logs.
+        """
+        try:
+            body = login_response.json()
+        except ValueError:
+            raise ApiException(
+                f"BeginAuthSessionViaCredentials returned non-JSON status={login_response.status_code} for '{self.username}'"
+            )
+        if login_response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+            raise TooManyRequests(f"Steam login rate limit (too many requests) for '{self.username}': HTTP 429")
+        response = body.get('response', {}) if isinstance(body, dict) else {}
+        if not isinstance(response, dict) or not response:
+            raise ApiException(f"No response received from Steam API for '{self.username}'. Please try again later.")
+        required = ('client_id', 'steamid', 'request_id')
+        missing = [key for key in required if key not in response]
+        if not missing:
+            return {key: response[key] for key in required}
+        extended = response.get('extended_error_message')
+        interval = response.get('interval')
+        logger.debug(f"BeginAuthSessionViaCredentials keys for {self.username}: {sorted(response)}")
+        if 'interval' in response:
+            raise TooManyRequests(
+                f"Steam login rate limit (too many requests) for '{self.username}': {extended} retry_in={interval}s"
+            )
+        detail = f" message={extended}" if extended else ""
+        raise ApiException(
+            f"BeginAuthSessionViaCredentials missing {missing} for '{self.username}': keys={sorted(response)}{detail}"
+        )
+
     def _update_steam_guard(self, login_response: Response) -> None:
         try:
-            client_id = login_response.json()['response']['client_id']
-            steamid = login_response.json()['response']['steamid']
-            request_id = login_response.json()['response']['request_id']
+            auth_params = self._begin_auth_params(login_response)
+            client_id = auth_params['client_id']
+            steamid = auth_params['steamid']
+            request_id = auth_params['request_id']
             code_type = 3
             code = guard.generate_one_time_code(self.shared_secret)
 
@@ -130,19 +166,32 @@ class LoginExecutor:
             if response.status_code == HTTPStatus.OK:
                 self._pool_sessions_steam(client_id, request_id)
             else:
-                raise Exception('Cannot update Steam guard')
+                raise ApiException(f"Cannot update Steam guard for '{self.username}': status={response.status_code}")
         except Exception as e:
             logger.error(f"Steam Guard login step failed for '{self.username}': {type(e).__name__}")
             raise
 
     def _pool_sessions_steam(self, client_id: str, request_id: str) -> None:
-        try:
-            pool_data = {'client_id': client_id, 'request_id': request_id}
-            response = self._api_call('POST', 'IAuthenticationService', 'PollAuthSessionStatus', params=pool_data)
-            self.refresh_token = response.json()['response']['refresh_token']
-        except Exception as e:
-            logger.warning(f"Auth session polling failed for '{self.username}': {type(e).__name__}")
-            raise
+        """Poll until Steam issues the refresh token or attempts run out."""
+        max_attempts = 5
+        for attempt in range(1, max_attempts + 1):
+            try:
+                pool_data = {'client_id': client_id, 'request_id': request_id}
+                response = self._api_call('POST', 'IAuthenticationService', 'PollAuthSessionStatus', params=pool_data)
+                body = response.json()
+            except Exception as e:
+                logger.warning(f"Auth session polling failed for '{self.username}': {type(e).__name__}")
+                raise
+            inner = body.get('response', {}) if isinstance(body, dict) else {}
+            token = inner.get('refresh_token') if isinstance(inner, dict) else None
+            if token:
+                self.refresh_token = token
+                return
+            logger.debug(f"Auth session poll {attempt}/{max_attempts} has no refresh token yet for '{self.username}'")
+            time.sleep(2)
+        raise ApiException(
+            f"Auth session polling timed out for '{self.username}': no refresh token after {max_attempts} attempts"
+        )
 
     def get_web_cookies(self, refresh_token: str, steam_id: str) -> List[str]:
         """
